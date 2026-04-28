@@ -1,0 +1,12 @@
+checkpoints/*.pt
+checkpoints/mlm/
+results/*.json
+results/*.png
+logs/*.out
+logs/*.err
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+notebooks/*_executed.ipynb
+.env
+wandb/
