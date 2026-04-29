@@ -15,7 +15,8 @@ def mask_paragraphs(paragraphs, mask_ratio_min=0.2, mask_ratio_max=0.4):
     mask_ratio = random.uniform(mask_ratio_min, mask_ratio_max)
     n_keep = max(1, int(n * (1 - mask_ratio)))
     indices = sorted(random.sample(range(n), n_keep))
-    return [paragraphs[i] for i in indices]
+    # Return both the masked text and the indices of the kept paragraphs
+    return [paragraphs[i] for i in indices], indices
 
 
 def sample_few_shot(dataset_split, n_per_class, seed, num_classes=10):

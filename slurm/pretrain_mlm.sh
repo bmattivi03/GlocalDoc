@@ -1,27 +1,16 @@
 #!/bin/bash
 #SBATCH --job-name=mlm_pretrain
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --time=24:00:00
-#SBATCH --mem=32G
+#SBATCH --ntasks-per-node=4
+#SBATCH --partition=spark
+#SBATCH --gres=gpu:4
+#SBATCH --time=12:00:00
+#SBATCH --mem=64G
 #SBATCH --output=logs/mlm_%j.out
 #SBATCH --error=logs/mlm_%j.err
 
-# --- HARDWARE SELECTION ---
-# If using Spark:
-##SBATCH --partition=spark
-##SBATCH --gres=gpu:4
-
-# If using RTX 4090:
-#SBATCH --gres=gpu:1
-
-# Load environment
 source ~/.bashrc
-# conda activate glocal_nlp
+conda activate glocal_nlp
+cd /path/to/GlocalDoc               # ← update before submitting
 
-cd "$SLURM_SUBMIT_DIR"
-
-# Execute MLM notebook
-jupyter nbconvert --to notebook --execute notebooks/03_pretrain_mlm.ipynb \
-    --output notebooks/03_pretrain_mlm_executed.ipynb \
-    --ExecutePreprocessor.timeout=86400
+accelerate launch --num_processes=4 train_mlm.py
