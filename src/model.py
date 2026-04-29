@@ -20,6 +20,9 @@ class GlocalIBModel(nn.Module):
         super().__init__()
         self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
         self.encoder = RobertaModel.from_pretrained("roberta-base")
+        
+        # Enable gradient checkpointing to save VRAM by recomputing activations during backward pass
+        self.encoder.gradient_checkpointing_enable()
 
         # Student probabilistic head
         self.mu_head = nn.Linear(768, hidden_dim)
@@ -39,9 +42,10 @@ class GlocalIBModel(nn.Module):
         self.device = device
         self.to(device)
 
-    def _encode_paragraphs(self, paragraphs, stop_grad=False):
+    def _encode_paragraphs(self, paragraphs, stop_grad=False, max_paras=100):
         """
         Encode a list of paragraph strings to a single (768,) document vector.
+        Uses Head+Tail truncation if len > max_paras (50 first + 50 last).
 
         Each paragraph is tokenized and encoded independently via RoBERTa (chunk-and-pool):
         paragraph → RoBERTa → CLS token (768-dim) → mean-pool across all paragraphs.
@@ -49,6 +53,10 @@ class GlocalIBModel(nn.Module):
         stop_grad=True: teacher branch — encoder runs under torch.no_grad(),
                         so no gradients flow through this path.
         """
+        if len(paragraphs) > max_paras:
+            half = max_paras // 2
+            paragraphs = paragraphs[:half] + paragraphs[-half:]
+
         para_vecs = []
         for para in paragraphs:
             enc = self.tokenizer(
@@ -128,7 +136,12 @@ class DocumentClassifier(nn.Module):
         self.device = device
         self.to(device)
 
-    def _encode_paragraphs(self, paragraphs):
+    def _encode_paragraphs(self, paragraphs, max_paras=100):
+        """Uses Head+Tail truncation if len > max_paras (50 first + 50 last)."""
+        if len(paragraphs) > max_paras:
+            half = max_paras // 2
+            paragraphs = paragraphs[:half] + paragraphs[-half:]
+
         para_vecs = []
         for para in paragraphs:
             enc = self.tokenizer(
