@@ -1,170 +1,146 @@
+import contextlib
 import torch
 import torch.nn as nn
-from transformers import RobertaModel, RobertaTokenizer
+from transformers import RobertaModel, RobertaTokenizerFast
+
+
+class AttentionPooling(nn.Module):
+    def __init__(self, dim: int = 768, max_chunks: int = 200):
+        super().__init__()
+        self.attn_query = nn.Parameter(torch.randn(dim) * 0.01)
+        self.chunk_pos  = nn.Embedding(max_chunks, dim)
+        nn.init.zeros_(self.chunk_pos.weight)
+
+    def forward(self, chunk_vecs: torch.Tensor, return_weights: bool = False):
+        N       = chunk_vecs.size(0)
+        pos_ids = torch.arange(N, device=chunk_vecs.device)
+        vecs    = chunk_vecs + self.chunk_pos(pos_ids)
+        scores  = vecs @ self.attn_query
+        weights = torch.softmax(scores, dim=0)
+        doc_vec = (weights.unsqueeze(-1) * vecs).sum(0)
+        if return_weights:
+            return doc_vec, weights
+        return doc_vec
 
 
 class GlocalIBModel(nn.Module):
-    """
-    Teacher-student GlocalIB model.
-
-    Teacher branch: reads full document, stop-gradient (no_grad on encoder forward).
-    Student branch: reads masked document, outputs probabilistic (mu, sigma) via
-                    a head on the pooled representation, then projects via MLP.
-
-    Both branches share self.encoder weights. The teacher path never contributes
-    gradients — only the student path drives parameter updates. This is the
-    stop-gradient mechanism that prevents representational collapse (same as BYOL/SimSiam).
-    """
-
-    def __init__(self, hidden_dim=256, proj_dim=512, device="cuda"):
+    def __init__(self, hidden_dim: int = 256, proj_dim: int = 512,
+                 max_chunks: int = 50, device: str = "cuda"):
         super().__init__()
-        self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
-        self.encoder = RobertaModel.from_pretrained("roberta-base")
-        
-        # Enable gradient checkpointing to save VRAM by recomputing activations during backward pass
+        self.tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
+        self.encoder   = RobertaModel.from_pretrained("distilroberta-base")
         self.encoder.gradient_checkpointing_enable()
 
-        # Student probabilistic head
-        self.mu_head = nn.Linear(768, hidden_dim)
+        self.attention_pool = AttentionPooling(dim=768, max_chunks=200)
+
+        # IB probabilistic head
+        self.mu_head        = nn.Linear(768, hidden_dim)
         self.log_sigma_head = nn.Linear(768, hidden_dim)
 
-        # MLP projector: Z(256) → 512 → 768
+        # MLP projector: 256 → 512 → 768
         self.projector = nn.Sequential(
             nn.Linear(hidden_dim, proj_dim),
             nn.ReLU(),
             nn.Linear(proj_dim, 768),
         )
 
-        # Learnable compression strength; clamped to min 0.01 to prevent collapse
-        self.log_beta = nn.Parameter(torch.tensor(0.0))
+        # Homoscedastic uncertainty weights: [compress, local, inter, global]
+        self.log_s = nn.Parameter(torch.zeros(4))
 
-        self.hidden_dim = hidden_dim
-        self.device = device
+        self.max_chunks = max_chunks
         self.to(device)
 
-    def _encode_paragraphs(self, paragraphs, stop_grad=False, max_paras=100):
-        """
-        Encode a list of paragraph strings to a single (768,) document vector.
-        Uses Head+Tail truncation if len > max_paras (50 first + 50 last).
-
-        Each paragraph is tokenized and encoded independently via RoBERTa (chunk-and-pool):
-        paragraph → RoBERTa → CLS token (768-dim) → mean-pool across all paragraphs.
-
-        stop_grad=True: teacher branch — encoder runs under torch.no_grad(),
-                        so no gradients flow through this path.
-        """
-        if len(paragraphs) > max_paras:
-            half = max_paras // 2
+    def _encode_chunks(self, paragraphs: list, stop_grad: bool) -> torch.Tensor:
+        if len(paragraphs) > self.max_chunks:
+            half = self.max_chunks // 2
             paragraphs = paragraphs[:half] + paragraphs[-half:]
 
-        para_vecs = []
-        for para in paragraphs:
-            enc = self.tokenizer(
-                para,
-                max_length=512,
-                truncation=True,
-                padding="max_length",
-                return_tensors="pt",
-            ).to(self.device)
-            if stop_grad:
-                with torch.no_grad():
-                    out = self.encoder(**enc)
-            else:
-                out = self.encoder(**enc)
-            cls_vec = out.last_hidden_state[:, 0, :]  # (1, 768)
-            para_vecs.append(cls_vec)
-        return torch.stack(para_vecs).squeeze(1).mean(0)  # (768,)
+        enc = self.tokenizer(
+            paragraphs, padding=True, truncation=True,
+            max_length=512, return_tensors="pt",
+        ).to(self.encoder.device)
 
-    def forward(self, full_paragraphs_batch, masked_paragraphs_batch):
-        """
-        Args:
-            full_paragraphs_batch:   list[list[str]] — teacher input (all paragraphs)
-            masked_paragraphs_batch: list[list[str]] — student input (20-40% dropped)
+        ctx = torch.no_grad() if stop_grad else contextlib.nullcontext()
+        with ctx:
+            out = self.encoder(**enc)
 
-        Returns:
-            Z_prime (B, 768) — teacher document representations (stop-grad)
-            mu      (B, 256) — student distribution means
-            sigma   (B, 256) — student distribution std devs
-            Z_proj  (B, 768) — student projections (aligned to Z_prime)
-            beta    scalar   — current compression strength (clamped >= 0.01)
-        """
-        batch_z_prime, batch_mu, batch_sigma, batch_z_proj = [], [], [], []
+        return out.last_hidden_state[:, 0, :]   # (N, 768)
 
-        for full_paras, masked_paras in zip(full_paragraphs_batch, masked_paragraphs_batch):
-            # Teacher branch — stop-gradient, full document
-            z_prime = self._encode_paragraphs(full_paras, stop_grad=True)   # (768,)
+    def forward(self, full_batch: list, masked_batch: list, kept_indices_batch: list):
+        Z_prime_list, Z_proj_list  = [], []
+        Z_inter_s_list, Z_inter_t_list = [], []
+        chunks_s_list, chunks_t_list   = [], []
+        mu_list, sigma_list = [], []
 
-            # Student branch — trainable, masked document
-            h = self._encode_paragraphs(masked_paras, stop_grad=False)      # (768,)
-            mu = self.mu_head(h)                                             # (256,)
-            sigma = torch.exp(self.log_sigma_head(h))                        # (256,)
+        for full, masked, indices in zip(full_batch, masked_batch, kept_indices_batch):
+            # Teacher branch (stop-gradient)
+            t_chunks = self._encode_chunks(full, stop_grad=True)          # (N, 768)
+            Z_prime  = self.attention_pool(t_chunks)                      # (768,)
+            valid_idx = [i for i in indices if i < len(t_chunks)]
+            if not valid_idx:
+                valid_idx = [0]
+            t_chunks_kept = t_chunks[valid_idx]                           # (M, 768)
 
-            # Reparameterization trick: z = mu + sigma * eps
-            z = mu + sigma * torch.randn_like(mu)
-            z_proj = self.projector(z)                                       # (768,)
+            # Student branch
+            s_chunks  = self._encode_chunks(masked, stop_grad=False)      # (M, 768)
+            z_partial = self.attention_pool(s_chunks)                     # (768,)
 
-            batch_z_prime.append(z_prime)
-            batch_mu.append(mu)
-            batch_sigma.append(sigma)
-            batch_z_proj.append(z_proj)
+            # IB bottleneck
+            mu       = self.mu_head(z_partial)
+            sigma    = torch.exp(self.log_sigma_head(z_partial))
+            z_sample = mu + sigma * torch.randn_like(mu)
+            Z_proj   = self.projector(z_sample)                           # (768,)
 
-        Z_prime = torch.stack(batch_z_prime)   # (B, 768)
-        mu      = torch.stack(batch_mu)        # (B, 256)
-        sigma   = torch.stack(batch_sigma)     # (B, 256)
-        Z_proj  = torch.stack(batch_z_proj)    # (B, 768)
-        beta    = torch.clamp(torch.exp(self.log_beta), min=0.01)
+            # Teacher partial pool (for intermediate loss)
+            Z_teacher_partial = self.attention_pool(t_chunks_kept)        # (768,)
 
-        return Z_prime, mu, sigma, Z_proj, beta
+            Z_prime_list.append(Z_prime)
+            Z_proj_list.append(Z_proj)
+            Z_inter_s_list.append(z_partial)
+            Z_inter_t_list.append(Z_teacher_partial)
+            chunks_s_list.append(s_chunks)
+            chunks_t_list.append(t_chunks_kept)
+            mu_list.append(mu)
+            sigma_list.append(sigma)
+
+        return (
+            torch.stack(Z_prime_list),       # (B, 768) — teacher full doc
+            torch.stack(Z_proj_list),        # (B, 768) — student IB projection
+            torch.stack(Z_inter_s_list),     # (B, 768) — student partial aggregate
+            torch.stack(Z_inter_t_list),     # (B, 768) — teacher partial aggregate
+            chunks_s_list,                   # list[Tensor(M, 768)] — variable length
+            chunks_t_list,                   # list[Tensor(M, 768)] — variable length
+            torch.stack(mu_list),            # (B, 256)
+            torch.stack(sigma_list),         # (B, 256)
+            self.log_s,                      # (4,) — learnable weights
+        )
 
 
 class DocumentClassifier(nn.Module):
-    """
-    Fine-tuning classifier for multi-label ECtHR classification.
-
-    Full fine-tuning: all encoder weights + linear head are trainable.
-    Uses the same chunk-and-pool strategy as GlocalIBModel for consistency —
-    each paragraph encoded independently, then mean-pooled into a document vector.
-
-    Initialized from a pre-trained encoder (GlocalIB student or MLM baseline).
-    """
-
-    def __init__(self, encoder, tokenizer, num_labels=10, device="cuda"):
+    def __init__(self, encoder: nn.Module, tokenizer,
+                 num_labels: int = 10, max_chunks: int = 50, device: str = "cuda"):
         super().__init__()
-        self.encoder = encoder
-        self.tokenizer = tokenizer
-        self.classifier = nn.Linear(768, num_labels)
-        self.device = device
+        self.encoder     = encoder
+        self.tokenizer   = tokenizer
+        self.attn_pool   = AttentionPooling(dim=768, max_chunks=200)
+        self.classifier  = nn.Linear(768, num_labels)
+        self.max_chunks  = max_chunks
         self.to(device)
 
-    def _encode_paragraphs(self, paragraphs, max_paras=100):
-        """Uses Head+Tail truncation if len > max_paras (50 first + 50 last)."""
-        if len(paragraphs) > max_paras:
-            half = max_paras // 2
+    def _encode_chunks(self, paragraphs: list) -> torch.Tensor:
+        if len(paragraphs) > self.max_chunks:
+            half = self.max_chunks // 2
             paragraphs = paragraphs[:half] + paragraphs[-half:]
+        enc = self.tokenizer(
+            paragraphs, padding=True, truncation=True,
+            max_length=512, return_tensors="pt",
+        ).to(self.encoder.device)
+        out = self.encoder(**enc)
+        return out.last_hidden_state[:, 0, :]   # (N, 768)
 
-        para_vecs = []
-        for para in paragraphs:
-            enc = self.tokenizer(
-                para,
-                max_length=512,
-                truncation=True,
-                padding="max_length",
-                return_tensors="pt",
-            ).to(self.device)
-            out = self.encoder(**enc)
-            cls_vec = out.last_hidden_state[:, 0, :]  # (1, 768)
-            para_vecs.append(cls_vec)
-        return torch.stack(para_vecs).squeeze(1).mean(0)  # (768,)
-
-    def forward(self, paragraphs_batch):
-        """
-        Args:
-            paragraphs_batch: list[list[str]]
-
-        Returns:
-            (B, num_labels) sigmoid probabilities
-        """
+    def forward(self, paragraphs_batch: list) -> torch.Tensor:
         doc_vecs = torch.stack([
-            self._encode_paragraphs(paras) for paras in paragraphs_batch
-        ])  # (B, 768)
-        return torch.sigmoid(self.classifier(doc_vecs))  # (B, 10)
+            self.attn_pool(self._encode_chunks(paras))
+            for paras in paragraphs_batch
+        ])   # (B, 768)
+        return torch.sigmoid(self.classifier(doc_vecs))   # (B, num_labels)
