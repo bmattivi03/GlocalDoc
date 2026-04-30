@@ -4,123 +4,128 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MSc research project at Free University of Bozen-Bolzano (April 2026). Adapts the GlocalIB (Global-Local Information Bottleneck) objective from time series imputation to few-shot legal document classification using the ECtHR dataset.
+MSc research at Free University of Bozen-Bolzano (2026). Adapts the GlocalIB (Global-Local Information Bottleneck) objective to few-shot legal document classification on the ECtHR dataset (`coastalcph/lex_glue / ecthr_a`). The core hypothesis: compressing masked-document representations through an explicit IB bottleneck produces better few-shot features than standard MLM pre-training.
 
-The core bet: forcing a model to reconstruct a full document's meaning from partially masked paragraphs — with an explicit compression bottleneck — produces representations that generalize better with only 10–100 labeled examples.
+Full architecture spec and rationale: `doc/PLAN.md`. Task status: `doc/TODO.md`.
 
-See `doc/TODO.md` for current implementation status and `doc/PLAN.md` for the full step-by-step implementation plan.
-
-## Environment Setup
+## Common Commands
 
 ```bash
-conda create -n glocal_nlp python=3.10
-conda activate glocal_nlp
-conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
-pip install -r requirements.txt
+# Verify all imports and a full forward+backward pass (CPU, no GPU needed)
+python -c "
+import torch; from src.model import GlocalIBModel; from src.loss import glocal_ib_loss; from src.data import mask_paragraphs
+model = GlocalIBModel(device='cpu')
+full = [['Para A.', 'Para B.', 'Para C.', 'Para D.']]
+md = [mask_paragraphs(p) for p in full]
+out = model(full, [m[0] for m in md], [m[1] for m in md])
+total, *_ = glocal_ib_loss(*out)
+total.backward()
+print('OK', total.item())
+"
+
+# Data exploration (prints stats, saves histogram to results/)
+python scripts/01_data_exploration.py
+
+# Pre-train — single GPU
+python scripts/02_pretrain_glocal.py        # edit CONDITION at top first
+
+# Pre-train — multi-GPU (e.g. 10 GPUs)
+accelerate launch --num_processes=10 scripts/02_pretrain_glocal.py
+
+# MLM baseline
+accelerate launch --num_processes=10 scripts/03_pretrain_mlm.py
+
+# Fine-tune all 3 conditions × N × seeds → results/finetuning_results.json
+python scripts/04_finetune.py
 ```
 
-Verify GPU and imports:
-```bash
-python -c "import torch; print(torch.cuda.is_available())"
-python -c "from src.data import load_ecthr; from src.model import GlocalIBModel; from src.loss import glocal_ib_loss; print('OK')"
+## Architecture
+
+### Two-branch teacher-student
+
+Both branches share a single `distilroberta-base` encoder (loaded as `RobertaModel` — there is no `DistilRobertaModel` class in transformers). The teacher sees the **full** document; the student sees only the **kept** paragraphs after masking.
+
+```
+Teacher (stop-grad):  paragraphs → _encode_chunks(stop_grad=True) → AttentionPooling → Z′  (768)
+Student (trainable):  kept paras → _encode_chunks(stop_grad=False) → AttentionPooling → z_partial (768)
+                                                                                               ↓
+                                                              mu_head / log_sigma_head → μ, σ  (256)
+                                                              reparameterize → z_sample
+                                                              projector (256→512→768) → Z_proj  (768)
 ```
 
-## Compute
+`_encode_chunks` does a **single batched forward pass** over all paragraphs (dynamic padding, `padding=True`). Documents longer than `max_chunks=50` are truncated symmetrically (first half + last half).
 
-| Job | Node | SLURM flags |
-|-----|------|-------------|
-| GlocalIB pre-training | Spark 128GB | `--partition=spark --gres=gpu:4` |
-| MLM pre-training | Spark 128GB | `--partition=spark --gres=gpu:4` |
-| Fine-tuning / exploration | Standard 32GB | `--gres=gpu:1` |
+`AttentionPooling` uses a learnable query vector + positional embeddings (zero-initialized → starts as mean pooling, learns deviations).
 
-Batch size guidance: `BATCH_SIZE=1` + `GRAD_ACCUM=4` on 32GB, `BATCH_SIZE=4` + no grad accum on Spark. Confirm the Spark partition name with the lab admin before submitting.
+### Four-component loss with Homoscedastic Uncertainty Weighting
 
-## src/ Module API
+```
+L = (L_compress · exp(−s₀) + s₀)   # KL( N(μ,σ²) ∥ N(0,1) )
+  + (L_local   · exp(−s₁) + s₁)   # cosine dist: student chunks vs teacher chunks (kept positions)
+  + (L_inter   · exp(−s₂) + s₂)   # cosine dist: student partial pool vs teacher partial pool
+  + (L_global  · exp(−s₃) + s₃)   # cosine dist: Z_proj vs Z′
 
-All notebooks import from `src/` via `sys.path.append("..")`.
+log_s = nn.Parameter(torch.zeros(4))   # all four weights learned jointly
+```
 
-**`src/data.py`**
-- `load_ecthr(min_paragraphs=5)` — loads `coastalcph/lex_glue / ecthr_a` from HuggingFace, filters docs with fewer than 5 paragraphs. Returns a HuggingFace `DatasetDict`.
-- `mask_paragraphs(paragraphs, mask_ratio_min=0.2, mask_ratio_max=0.4)` — randomly drops 20–40% of paragraphs, always keeps at least 1. Returns `(kept_paragraphs: list[str], kept_indices: list[int])`.
-- `sample_few_shot(dataset_split, n_per_class, seed, num_classes=10)` — multi-label aware: samples until each class has ≥ n_per_class examples, deduplicates documents that satisfy multiple classes.
+`disable_ib=True` (for `glocal_beta0` condition) skips everything and returns only `L_global`.
 
-**`src/loss.py`**
-- `alignment_loss(z1, z2)` — `1 - mean cosine_similarity(z1, z2)`, inputs (N, D).
-- `compression_loss(mu, sigma)` — closed-form KL(N(mu, sigma²) ∥ N(0,1)), inputs (B, H).
-- `glocal_ib_loss(Z_prime, Z_proj, Z_inter_s, Z_inter_t, chunks_s, chunks_t, mu, sigma, log_s, disable_ib=False)` — returns `(total, l_compress, l_local, l_inter, l_global)`. Pass `disable_ib=True` for the `glocal_beta0` ablation.
+### Data flow through training
+
+`mask_paragraphs(paragraphs)` → returns `(kept_paragraphs: list[str], kept_indices: list[int])`.
+`load_ecthr()` filters documents with fewer than 5 paragraphs.
+`sample_few_shot(split, n_per_class, seed)` is multi-label aware — deduplicates docs satisfying multiple classes.
+
+### Checkpoint format
+
+`train_glocal.py` (and `scripts/02_pretrain_glocal.py`) saves **two** files per epoch:
+- `checkpoints/{CONDITION}_epoch{N}/` — full accelerator state (resumable training)
+- `checkpoints/{CONDITION}_epoch{N}.pt` — plain `model.state_dict()` (used by `scripts/04_finetune.py`)
+
+MLM baseline saves in HuggingFace format via `trainer.save_model("checkpoints/mlm_baseline")`.
+
+## src/ API
+
+**`src/data.py`** — do not modify
+- `load_ecthr(min_paragraphs=5)` → `DatasetDict`
+- `mask_paragraphs(paragraphs)` → `(list[str], list[int])`
+- `sample_few_shot(split, n_per_class, seed, num_classes=10)` → `list[dict]`
 
 **`src/model.py`**
-- `AttentionPooling(dim=768, max_chunks=200)` — learnable query-based pooling with positional embeddings. Zero-initialized (starts as mean pooling).
-- `GlocalIBModel(hidden_dim=256, proj_dim=512, max_chunks=50, device="cuda")` — full teacher-student architecture using `distilroberta-base` (loaded as `RobertaModel`). Forward: `forward(full_batch, masked_batch, kept_indices_batch)` where all args are `list[list[str]]` / `list[list[int]]`. Returns `(Z_prime, Z_proj, Z_inter_s, Z_inter_t, chunks_s, chunks_t, mu, sigma, log_s)`.
-- `DocumentClassifier(encoder, tokenizer, num_labels=10, max_chunks=50, device="cuda")` — fine-tuning classifier. Takes a pre-trained encoder. Forward: `forward(paragraphs_batch: list[list[str]])` → `(B, 10)` sigmoid probabilities.
+- `GlocalIBModel(hidden_dim=256, proj_dim=512, max_chunks=50, device="cuda")` — forward: `(full_batch, masked_batch, kept_indices_batch)` → 9-tuple `(Z_prime, Z_proj, Z_inter_s, Z_inter_t, chunks_s, chunks_t, mu, sigma, log_s)`
+- `DocumentClassifier(encoder, tokenizer, num_labels=10, max_chunks=50, device="cuda")` — forward: `(paragraphs_batch)` → `(B, 10)` sigmoid
+- `AttentionPooling(dim=768, max_chunks=200)`
 
-## Architecture (v2)
-
-Two-branch setup using `distilroberta-base` weights (6-layer RoBERTa, 82M params):
-
-**Teacher branch** (stop-gradient): batched encode all paragraphs → `AttentionPooling` → deterministic Z' (768-dim).
-
-**Student branch** (trainable): batched encode kept paragraphs → `AttentionPooling` → IB bottleneck → mu (256), sigma (256) → reparameterization → MLP projector → Z_proj (768).
-
-```
-Probabilistic head:   z_partial (768) → Linear → mu (256)
-                      z_partial (768) → Linear → log_sigma → sigma = exp(log_sigma)
-                      Z = mu + sigma * N(0,1)
-
-MLP projector:        Z (256) → Linear(256,512) → ReLU → Linear(512,768) → Z_proj
-
-Loss weights:         self.log_s = nn.Parameter(torch.zeros(4))
-                      weights[i] = exp(-log_s[i])   (Homoscedastic Uncertainty Weighting)
-```
-
-**Batched encoding**: all paragraphs tokenized in a single forward pass with dynamic padding (`padding=True`). Combined with `distilroberta-base` and gradient checkpointing, this fits on a 32GB GPU at `BATCH_SIZE=1`.
-
-## Loss (v2)
-
-```
-L_total = L_compress × exp(−s₀) + s₀
-        + L_local   × exp(−s₁) + s₁
-        + L_inter   × exp(−s₂) + s₂
-        + L_global  × exp(−s₃) + s₃
-
-L_compress  = KL( N(mu, sigma²) || N(0,1) )
-L_local     = 1 - cosine_sim(student_chunks_kept, teacher_chunks_kept)
-L_inter     = 1 - cosine_sim(attn_pool(s_chunks), attn_pool(t_chunks_kept))
-L_global    = 1 - cosine_sim(Z_proj, Z_prime)
-```
+**`src/loss.py`**
+- `glocal_ib_loss(*model_output, disable_ib=False)` → `(total, l_compress, l_local, l_inter, l_global)`
+- `alignment_loss(z1, z2)`, `compression_loss(mu, sigma)`
 
 ## Experimental Conditions
 
-Three conditions — identical data, identical starting weights, only the pre-training objective differs:
+| Condition | Pre-training | `disable_ib` |
+|-----------|-------------|--------------|
+| `glocal_ib` | Full 4-component loss + UW | `False` |
+| `glocal_beta0` | Global alignment only (ablation) | `True` |
+| `mlm` | Standard MLM on ECtHR paragraphs | N/A |
 
-| Condition | Description | `disable_ib` |
-|---|---|---|
-| `mlm` | DistilRoBERTa + standard MLM on ECtHR (HF Trainer) | N/A |
-| `glocal_beta0` | Full GlocalIB architecture, global alignment only (ablation) | `True` |
-| `glocal_ib` | Full 4-component loss + Homoscedastic UW | `False` |
-
-Fine-tuning: N = {10, 50, 100} labeled examples × 5 seeds. Metric: macro-F1 on ECtHR test set.
+Fine-tuning: N ∈ {10, 50, 100} × 5 seeds. Metric: **macro-F1** (mandatory — class imbalance is severe: label 3 has 4704 training examples, label 5 has 41).
 
 ## Key Invariants
 
-- Teacher always sees the full document. Stop-gradient enforced via `torch.no_grad()` in `_encode_chunks(stop_grad=True)`.
-- Student paragraph masking is independent of the 512-token chunk limit — they are separate mechanisms.
-- `distilroberta-base` loads as `RobertaModel` (no `DistilRobertaModel` class in transformers).
-- Evaluation metric must be macro-F1 (heavy class imbalance: Article 3 has 4704 cases, Article 5 has 41).
-- If all four `log_s` stay near 0 by epoch 2, the uncertainty weighting is degenerate — report as diagnostic.
+- `distilroberta-base` loads via `RobertaModel.from_pretrained("distilroberta-base")` — no `DistilRobertaModel`.
+- Teacher branch is always `stop_grad=True` (`torch.no_grad()` inside `_encode_chunks`).
+- `log_s` uses Kendall & Gal Homoscedastic UW — no `clamp` on weights.
+- If all four `log_s` stay near 0 through epoch 2, the uncertainty weighting is degenerate — flag it, don't ignore.
+- `scripts/` contains standalone Python equivalents of all notebooks (SSH/cluster friendly). Notebooks in `notebooks/` are kept for interactive use.
 
-## Notebooks Workflow
+## Compute
 
-Notebooks live in `notebooks/` and import from `src/` via `sys.path.append("..")`. Run on the cluster via `jupyter nbconvert --to notebook --execute`. SLURM job scripts are in `slurm/`.
+| Job | Recommended | Batch config |
+|-----|------------|-------------|
+| GlocalIB pre-training | 4× A100 (Spark) | `BATCH_SIZE=1`, `GRAD_ACCUM=4` → effective 16 |
+| MLM pre-training | 4× A100 (Spark) | `BATCH_SIZE=4` |
+| Fine-tuning / exploration | 1× 32GB GPU | `BATCH_SIZE=4` |
+| Sanity checks | CPU | no GPU required |
 
-| Notebook | Purpose |
-|---|---|
-| `01_data_exploration.ipynb` | Dataset stats, masking sanity check |
-| `02_pretrain_glocal.ipynb` | GlocalIB pre-training (set `CONDITION` in Cell 1) |
-| `03_pretrain_mlm.ipynb` | MLM baseline via HuggingFace Trainer |
-| `04_finetune.ipynb` | All 3 conditions × N × seeds → `results/finetuning_results.json` |
-| `05_evaluate.ipynb` | Macro-F1 table, performance curve, log_s trajectory from W&B |
-
-## Logging
-
-W&B project: `glocal-nlp`. Log per training step: `total_loss`, `l_compress`, `l_local`, `l_inter`, `l_global`, `log_s_0_compress`, `log_s_1_local`, `log_s_2_inter`, `log_s_3_global`, `epoch`. The `log_s` trajectory is the key diagnostic — fetch it in `05_evaluate.ipynb` via `wandb.Api()`.
+On 10× 11GB GPUs: keep `BATCH_SIZE=1`, `GRAD_ACCUM=4` → effective batch 40. W&B project: `glocal-nlp`.
