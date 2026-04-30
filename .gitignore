@@ -10,4 +10,4 @@ __pycache__/
 notebooks/*_executed.ipynb
 .env
 wandb/
-doc/
+
