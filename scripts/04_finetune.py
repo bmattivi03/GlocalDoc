@@ -8,7 +8,7 @@ from sklearn.metrics import f1_score
 from transformers import RobertaForMaskedLM, RobertaTokenizerFast
 
 sys.path.append(".")
-from src.data import load_ecthr, sample_few_shot
+from src.data import load_ecthr, sample_few_shot, truncate_paragraphs
 from src.model import GlocalIBModel, DocumentClassifier
 
 # --- CONFIG ---
@@ -21,9 +21,6 @@ DEVICE      = "cuda" if torch.cuda.is_available() else "cpu"
 
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-# Checkpoint paths produced by the pre-training scripts.
-# glocal conditions: plain .pt file saved at the end of the last epoch.
-# mlm condition:     HuggingFace model directory saved by trainer.save_model().
 CONDITIONS = {
     "glocal_ib":    ("checkpoints/glocal_ib_epoch4.pt",    "glocal"),
     "glocal_beta0": ("checkpoints/glocal_beta0_epoch4.pt", "glocal"),
@@ -33,43 +30,67 @@ CONDITIONS = {
 
 def load_encoder(path, ckpt_type):
     if ckpt_type == "glocal":
-        # Reconstruct full GlocalIBModel and load the saved state dict,
-        # then extract just the encoder and tokenizer for fine-tuning.
         m = GlocalIBModel(device=DEVICE)
         state = torch.load(path, map_location=DEVICE)
         m.load_state_dict(state)
-        return m.encoder, m.tokenizer
+        return m.encoder, m.tokenizer, m.attention_pool
     else:
-        # MLM checkpoint is a full RobertaForMaskedLM saved in HF format.
         mlm = RobertaForMaskedLM.from_pretrained(path)
         tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
-        return mlm.roberta.to(DEVICE), tokenizer
+        return mlm.roberta.to(DEVICE), tokenizer, None
 
 
-def run_few_shot(encoder, tokenizer, train_split, test_split, n, seed):
+def run_few_shot(encoder, tokenizer, attn_pool, train_split, val_split, test_split, n, seed):
     few_shot = sample_few_shot(train_split, n, seed)
-    clf = DocumentClassifier(encoder, tokenizer, device=DEVICE)
+    clf = DocumentClassifier(encoder, tokenizer, attn_pool=attn_pool, device=DEVICE)
     opt = AdamW(clf.parameters(), lr=LR)
-    criterion = torch.nn.BCELoss()
+    criterion = torch.nn.BCEWithLogitsLoss()
 
-    clf.train()
-    for _ in range(FINETUNE_EPOCHS):
+    best_f1 = -1.0
+    best_state = None
+
+    for epoch in range(FINETUNE_EPOCHS):
+        clf.train()
+        # FIX: Stability - aggregate gradients if batch_size=1 is used, 
+        # but here we can just loop and step. Better to use small batch.
         for ex in few_shot:
             opt.zero_grad()
-            probs  = clf([ex["text"]])
+            logits = clf([ex["text"]])
             labels = torch.zeros(1, 10, device=DEVICE)
             for l in ex["labels"]:
                 if l < 10:
                     labels[0][l] = 1.0
-            loss = criterion(probs, labels)
+            loss = criterion(logits, labels)
             loss.backward()
             opt.step()
 
+        # Validation
+        clf.eval()
+        v_preds, v_targets = [], []
+        with torch.no_grad():
+            for ex in val_split:
+                # Truncation is handled inside DocumentClassifier.forward now
+                logits = clf([ex["text"]])
+                p = torch.sigmoid(logits).cpu().numpy()[0]
+                v_preds.append((p >= 0.5).astype(int))
+                t = np.zeros(10, dtype=int)
+                for l in ex["labels"]:
+                    if l < 10:
+                        t[l] = 1
+                v_targets.append(t)
+        
+        v_f1 = f1_score(np.array(v_targets), np.array(v_preds), average="macro", zero_division=0)
+        if v_f1 > best_f1:
+            best_f1 = v_f1
+            best_state = {k: v.cpu().clone() for k, v in clf.state_dict().items()}
+
+    clf.load_state_dict(best_state)
     clf.eval()
     preds, targets = [], []
     with torch.no_grad():
         for ex in test_split:
-            p = clf([ex["text"]]).cpu().numpy()[0]
+            logits = clf([ex["text"]])
+            p = torch.sigmoid(logits).cpu().numpy()[0]
             preds.append((p >= 0.5).astype(int))
             t = np.zeros(10, dtype=int)
             for l in ex["labels"]:
@@ -91,13 +112,13 @@ def main():
             continue
 
         print(f"\n=== Condition: {cond} ===")
-        encoder, tokenizer = load_encoder(path, ckpt_type)
+        encoder, tokenizer, attn_pool = load_encoder(path, ckpt_type)
         all_results[cond] = {}
 
         for n in N_LIST:
             scores = []
             for seed in SEEDS:
-                f1 = run_few_shot(encoder, tokenizer, dataset["train"], dataset["test"], n, seed)
+                f1 = run_few_shot(encoder, tokenizer, attn_pool, dataset["train"], dataset["validation"], dataset["test"], n, seed)
                 scores.append(round(f1, 4))
                 print(f"  N={n:3d} | seed={seed} | macro-F1={f1:.4f}")
             all_results[cond][str(n)] = scores
@@ -109,7 +130,6 @@ def main():
         json.dump(all_results, f, indent=2)
     print(f"\nResults saved → {out_path}")
 
-    # Quick summary table
     print("\n--- Summary (macro-F1 mean ± std) ---")
     print(f"{'Condition':<15}", end="")
     for n in N_LIST:

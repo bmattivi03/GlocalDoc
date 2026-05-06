@@ -4,10 +4,10 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
 from transformers import RobertaForMaskedLM, RobertaTokenizerFast, DataCollatorForLanguageModeling
-from datasets import load_dataset
 import sys
 
 sys.path.append(".")
+from src.data import load_ecthr, truncate_paragraphs
 
 # --- CONFIG ---
 EPOCHS     = 3
@@ -19,16 +19,23 @@ def train():
     accelerator = Accelerator(log_with="wandb")
     if accelerator.is_main_process:
         import wandb
-        wandb.init(project="glocal-nlp", name="mlm_baseline_ddp")
+        wandb.init(project="glocal-nlp", name="mlm_baseline_fixed")
 
     tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
     model     = RobertaForMaskedLM.from_pretrained("distilroberta-base")
 
-    dataset = load_dataset("coastalcph/lex_glue", "ecthr_a")
+    dataset = load_ecthr()
 
     def tokenize_function(examples):
-        texts = [" ".join(doc) for doc in examples["text"]]
-        return tokenizer(texts, truncation=True, padding="max_length", max_length=512)
+        # FIX: Process the data EXACTLY like GlocalIB (paragraph-wise then join)
+        # However, MLM traditionally works on flattened text. 
+        # To be fair, we must ensure it only sees the SAME 50 paragraphs.
+        processed_texts = []
+        for doc_paragraphs in examples["text"]:
+            truncated = truncate_paragraphs(doc_paragraphs, max_chunks=50)
+            processed_texts.append(" ".join(truncated))
+            
+        return tokenizer(processed_texts, truncation=True, padding="max_length", max_length=512)
 
     tokenized_datasets = dataset.map(
         tokenize_function, batched=True, remove_columns=["text", "labels"]
