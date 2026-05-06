@@ -6,18 +6,18 @@ from accelerate import Accelerator
 import sys
 
 sys.path.append(".")
-from src.data import load_ecthr, mask_paragraphs
+from src.data import load_ecthr, mask_paragraphs, truncate_paragraphs
 from src.model import GlocalIBModel
 from src.loss import glocal_ib_loss
 
 # --- CONFIG ---
 EPOCHS         = 5
-BATCH_SIZE     = 1      # per GPU; effective = BATCH_SIZE × num_GPUs × GRAD_ACCUM
+BATCH_SIZE     = 1      
 GRAD_ACCUM     = 4
 LR             = 1e-5
 MAX_GRAD_NORM  = 1.0
 WANDB_PROJECT  = "glocal-nlp"
-CONDITION      = "glocal_ib"   # "glocal_ib" or "glocal_beta0"
+CONDITION      = "glocal_ib"
 DISABLE_IB     = (CONDITION == "glocal_beta0")
 
 
@@ -33,7 +33,7 @@ def train():
     device = accelerator.device
 
     if accelerator.is_main_process:
-        wandb.init(project=WANDB_PROJECT, name=CONDITION, config={
+        wandb.init(project=WANDB_PROJECT, name=f"{CONDITION}_momentum_fixed", config={
             "condition": CONDITION, "epochs": EPOCHS,
             "batch_size": BATCH_SIZE, "grad_accum": GRAD_ACCUM, "lr": LR,
         })
@@ -51,17 +51,23 @@ def train():
     for epoch in range(EPOCHS):
         model.train()
         for i, full_batch in enumerate(loader):
-            masked_data   = [mask_paragraphs(text) for text in full_batch]
-            masked_batch  = [m[0] for m in masked_data]
-            indices_batch = [m[1] for m in masked_data]
+            full_batch = [truncate_paragraphs(text, max_chunks=50) for text in full_batch]
+
+            masked_data    = [mask_paragraphs(text) for text in full_batch]
+            masked_batch   = [m[0] for m in masked_data]
+            indices_batch  = [m[1] for m in masked_data]
 
             with accelerator.accumulate(model):
                 out = model(full_batch, masked_batch, indices_batch)
                 total, lc, ll, li, lg = glocal_ib_loss(*out, disable_ib=DISABLE_IB)
                 accelerator.backward(total)
+                
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
+                
                 opt.step()
+                # FIX: Essential EMA update for the momentum teacher
+                accelerator.unwrap_model(model).update_teacher()
                 opt.zero_grad()
 
             if accelerator.sync_gradients:

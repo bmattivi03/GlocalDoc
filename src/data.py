@@ -9,6 +9,20 @@ def load_ecthr(min_paragraphs=5):
     return dataset
 
 
+def truncate_paragraphs(paragraphs, max_chunks=50):
+    """Head-tail truncation: keeps first and last N/2 paragraphs. Returns (paras, indices)."""
+    n = len(paragraphs)
+    if n <= max_chunks:
+        return paragraphs, list(range(n))
+    
+    half = max_chunks // 2
+    first_half = list(range(half))
+    last_half  = list(range(n - half, n))
+    
+    indices = first_half + last_half
+    return [paragraphs[i] for i in indices], indices
+
+
 def mask_paragraphs(paragraphs, mask_ratio_min=0.2, mask_ratio_max=0.4):
     """Randomly drop 20–40% of paragraphs. Always keeps at least 1."""
     n = len(paragraphs)
