@@ -6,19 +6,20 @@ from accelerate import Accelerator
 import sys
 
 sys.path.append(".")
-from src.data import load_ecthr, mask_paragraphs, truncate_paragraphs
+from src.data import load_ecthr, mask_text, get_paragraph_mask
 from src.model import GlocalIBModel
 from src.loss import glocal_ib_loss
 
-# --- CONFIG ---
-EPOCHS         = 5
-BATCH_SIZE     = 1      
-GRAD_ACCUM     = 4
-LR             = 1e-5
-MAX_GRAD_NORM  = 1.0
-WANDB_PROJECT  = "glocal-nlp"
-CONDITION      = "glocal_ib"
-DISABLE_IB     = (CONDITION == "glocal_beta0")
+# ── CONFIG ────────────────────────────────────────────────────────────────────
+EPOCHS        = 5
+BATCH_SIZE    = 1       # per GPU; effective = BATCH_SIZE × num_GPUs × GRAD_ACCUM
+GRAD_ACCUM    = 4
+LR            = 1e-5
+MAX_GRAD_NORM = 1.0
+EMA_TAU       = 0.99
+WANDB_PROJECT = "glocal-nlp"
+CONDITION     = "glocal_ib"
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 def collate_fn(batch):
@@ -33,13 +34,17 @@ def train():
     device = accelerator.device
 
     if accelerator.is_main_process:
-        wandb.init(project=WANDB_PROJECT, name=f"{CONDITION}_momentum_fixed", config={
-            "condition": CONDITION, "epochs": EPOCHS,
-            "batch_size": BATCH_SIZE, "grad_accum": GRAD_ACCUM, "lr": LR,
+        wandb.init(project=WANDB_PROJECT, name=CONDITION, config={
+            "condition":   CONDITION,
+            "epochs":      EPOCHS,
+            "batch_size":  BATCH_SIZE,
+            "grad_accum":  GRAD_ACCUM,
+            "lr":          LR,
+            "ema_tau":     EMA_TAU,
         })
 
     dataset = load_ecthr()
-    model   = GlocalIBModel(device=str(device))
+    model   = GlocalIBModel(ema_tau=EMA_TAU, device=str(device))
     opt     = AdamW(model.parameters(), lr=LR)
 
     loader = DataLoader(
@@ -50,41 +55,49 @@ def train():
     global_step = 0
     for epoch in range(EPOCHS):
         model.train()
-        for i, full_batch in enumerate(loader):
-            full_batch = [truncate_paragraphs(text, max_chunks=50) for text in full_batch]
-
-            masked_data    = [mask_paragraphs(text) for text in full_batch]
-            masked_batch   = [m[0] for m in masked_data]
-            indices_batch  = [m[1] for m in masked_data]
+        for full_batch in loader:
+            # Build Xm: word/sentence mask each paragraph in each document
+            masked_batch = [
+                [mask_text(para) for para in doc]
+                for doc in full_batch
+            ]
+            # Paragraph dropout indices (applied at pooling stage, not encoding)
+            kept_indices_batch = [
+                get_paragraph_mask(len(doc))
+                for doc in full_batch
+            ]
 
             with accelerator.accumulate(model):
-                out = model(full_batch, masked_batch, indices_batch)
-                total, lc, ll, li, lg = glocal_ib_loss(*out, disable_ib=DISABLE_IB)
+                out = model(full_batch, masked_batch, kept_indices_batch)
+                total, lc, ll, li, lg = glocal_ib_loss(*out)
                 accelerator.backward(total)
-                
+
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
-                
+
                 opt.step()
-                # FIX: Essential EMA update for the momentum teacher
-                accelerator.unwrap_model(model).update_teacher()
                 opt.zero_grad()
+
+                # EMA update after optimizer step — attention pooling only
+                if accelerator.sync_gradients:
+                    accelerator.unwrap_model(model).update_teacher_ema()
 
             if accelerator.sync_gradients:
                 global_step += 1
                 if global_step % 10 == 0 and accelerator.is_main_process:
-                    log_s = out[8].detach().float()
+                    log_s = out[7].detach().float()
                     wandb.log({
-                        "total_loss": total.item(),
-                        "l_compress": lc.item(),
-                        "l_local":    ll.item(),
-                        "l_inter":    li.item(),
-                        "l_global":   lg.item(),
-                        "log_s_0_compress": log_s[0].item(),
-                        "log_s_1_local":    log_s[1].item(),
-                        "log_s_2_inter":    log_s[2].item(),
-                        "log_s_3_global":   log_s[3].item(),
-                        "epoch": epoch, "step": global_step,
+                        "total_loss":     total.item(),
+                        "l_compress":     lc.item(),
+                        "l_local":        ll.item(),
+                        "l_inter":        li.item(),
+                        "l_global":       lg.item(),
+                        "log_s_compress": log_s[0].item(),
+                        "log_s_local":    log_s[1].item(),
+                        "log_s_inter":    log_s[2].item(),
+                        "log_s_global":   log_s[3].item(),
+                        "epoch":          epoch,
+                        "step":           global_step,
                     })
 
         if accelerator.is_main_process:
