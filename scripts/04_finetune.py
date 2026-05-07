@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from torch.optim import AdamW
 from sklearn.metrics import f1_score
-from transformers import RobertaForMaskedLM, RobertaTokenizerFast
+from transformers import RobertaModel, RobertaTokenizerFast, get_cosine_schedule_with_warmup
 
 sys.path.append(".")
 from src.data import load_ecthr, sample_few_shot
@@ -21,10 +21,9 @@ DEVICE          = "cuda" if torch.cuda.is_available() else "cpu"
 
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-# Two conditions: glocal_ib uses checkpoint epoch 4; mlm uses HF saved model.
 CONDITIONS = {
     "glocal_ib": ("checkpoints/glocal_ib_epoch4.pt", "glocal"),
-    "mlm":       ("checkpoints/mlm_baseline",         "mlm"),
+    "mlm":       ("checkpoints/h_mlm_epoch3.pt",      "h_mlm"),
 }
 
 
@@ -32,33 +31,37 @@ def load_encoder(path, ckpt_type):
     """Returns (encoder, tokenizer, attn_pool) ready for DocumentClassifier."""
     if ckpt_type == "glocal":
         m = GlocalIBModel(device=DEVICE)
-        state = torch.load(path, map_location=DEVICE)
-        m.load_state_dict(state)
-        # Teacher attention pool was shaped by full-document inputs throughout pre-training.
+        m.load_state_dict(torch.load(path, map_location=DEVICE))
         return m.encoder, m.tokenizer, m.attn_pool_teacher
-    else:
-        mlm = RobertaForMaskedLM.from_pretrained(path)
+    else:  # h_mlm
+        ckpt      = torch.load(path, map_location=DEVICE)
         tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
-        # MLM has no pre-trained attention pool — use a fresh one (zero-init = mean pooling).
+        encoder   = RobertaModel.from_pretrained("distilroberta-base")
+        encoder.load_state_dict(ckpt["encoder_state"])
+        encoder   = encoder.to(DEVICE)
         attn_pool = AttentionPooling(dim=768, max_chunks=50).to(DEVICE)
-        return mlm.roberta.to(DEVICE), tokenizer, attn_pool
+        attn_pool.load_state_dict(ckpt["attn_pool_state"])
+        return encoder, tokenizer, attn_pool
 
 
 def run_few_shot(encoder, tokenizer, attn_pool, train_split, val_split, test_split, n, seed):
-    few_shot = sample_few_shot(train_split, n, seed)
-    clf = DocumentClassifier(encoder, tokenizer, attn_pool=attn_pool, device=DEVICE)
-    opt = AdamW(clf.parameters(), lr=LR)
-    # DocumentClassifier.forward already applies sigmoid → use BCELoss, not BCEWithLogitsLoss.
+    few_shot  = sample_few_shot(train_split, n, seed)
+    clf       = DocumentClassifier(encoder, tokenizer, attn_pool=attn_pool, device=DEVICE)
+    opt       = AdamW(clf.parameters(), lr=LR)
     criterion = torch.nn.BCELoss()
 
-    best_f1    = -1.0
+    total_steps  = FINETUNE_EPOCHS * len(few_shot)
+    warmup_steps = max(1, total_steps // 10)
+    scheduler    = get_cosine_schedule_with_warmup(opt, warmup_steps, total_steps)
+
+    best_macro = -1.0
     best_state = None
 
     for epoch in range(FINETUNE_EPOCHS):
         clf.train()
         for ex in few_shot:
             opt.zero_grad()
-            probs = clf([ex["text"]])           # (1, 10) — sigmoid probabilities
+            probs  = clf([ex["text"]])           # (1, 10) — sigmoid probabilities
             labels = torch.zeros(1, 10, device=DEVICE)
             for lbl in ex["labels"]:
                 if lbl < 10:
@@ -66,14 +69,15 @@ def run_few_shot(encoder, tokenizer, attn_pool, train_split, val_split, test_spl
             loss = criterion(probs, labels)
             loss.backward()
             opt.step()
+            scheduler.step()
 
         # Validation
         clf.eval()
         v_preds, v_targets = [], []
         with torch.no_grad():
             for ex in val_split:
-                probs = clf([ex["text"]])        # (1, 10) — already sigmoid
-                p = probs.cpu().numpy()[0]
+                probs = clf([ex["text"]])
+                p     = probs.cpu().numpy()[0]
                 v_preds.append((p >= 0.5).astype(int))
                 t = np.zeros(10, dtype=int)
                 for lbl in ex["labels"]:
@@ -81,9 +85,9 @@ def run_few_shot(encoder, tokenizer, attn_pool, train_split, val_split, test_spl
                         t[lbl] = 1
                 v_targets.append(t)
 
-        v_f1 = f1_score(np.array(v_targets), np.array(v_preds), average="macro", zero_division=0)
-        if v_f1 > best_f1:
-            best_f1    = v_f1
+        v_macro = f1_score(np.array(v_targets), np.array(v_preds), average="macro", zero_division=0)
+        if v_macro > best_macro:
+            best_macro = v_macro
             best_state = {k: v.cpu().clone() for k, v in clf.state_dict().items()}
 
     clf.load_state_dict(best_state)
@@ -92,7 +96,7 @@ def run_few_shot(encoder, tokenizer, attn_pool, train_split, val_split, test_spl
     with torch.no_grad():
         for ex in test_split:
             probs = clf([ex["text"]])
-            p = probs.cpu().numpy()[0]
+            p     = probs.cpu().numpy()[0]
             preds.append((p >= 0.5).astype(int))
             t = np.zeros(10, dtype=int)
             for lbl in ex["labels"]:
@@ -100,12 +104,14 @@ def run_few_shot(encoder, tokenizer, attn_pool, train_split, val_split, test_spl
                     t[lbl] = 1
             targets.append(t)
 
-    return f1_score(np.array(targets), np.array(preds), average="macro", zero_division=0)
+    macro_f1 = f1_score(np.array(targets), np.array(preds), average="macro", zero_division=0)
+    micro_f1 = f1_score(np.array(targets), np.array(preds), average="micro", zero_division=0)
+    return {"macro_f1": round(macro_f1, 4), "micro_f1": round(micro_f1, 4)}
 
 
 def main():
     print("Loading dataset...")
-    dataset = load_ecthr()
+    dataset     = load_ecthr()
     all_results = {}
 
     for cond, (path, ckpt_type) in CONDITIONS.items():
@@ -118,18 +124,23 @@ def main():
         all_results[cond] = {}
 
         for n in N_LIST:
-            scores = []
+            macro_scores, micro_scores = [], []
             for seed in SEEDS:
-                f1 = run_few_shot(
+                metrics = run_few_shot(
                     encoder, tokenizer, attn_pool,
                     dataset["train"], dataset["validation"], dataset["test"],
                     n, seed,
                 )
-                scores.append(round(f1, 4))
-                print(f"  N={n:3d} | seed={seed} | macro-F1={f1:.4f}")
-            all_results[cond][str(n)] = scores
-            mean, std = np.mean(scores), np.std(scores)
-            print(f"  N={n:3d} | MEAN={mean:.4f} ± {std:.4f}")
+                macro_scores.append(metrics["macro_f1"])
+                micro_scores.append(metrics["micro_f1"])
+                print(f"  N={n:3d} | seed={seed} | macro-F1={metrics['macro_f1']:.4f} | micro-F1={metrics['micro_f1']:.4f}")
+
+            all_results[cond][str(n)] = {
+                "macro_f1": macro_scores,
+                "micro_f1": micro_scores,
+            }
+            print(f"  N={n:3d} | macro MEAN={np.mean(macro_scores):.4f}±{np.std(macro_scores):.4f}"
+                  f" | micro MEAN={np.mean(micro_scores):.4f}±{np.std(micro_scores):.4f}")
 
     out_path = os.path.join(RESULTS_DIR, "finetuning_results.json")
     with open(out_path, "w") as f:
@@ -144,7 +155,22 @@ def main():
     for cond, res in all_results.items():
         print(f"{cond:<15}", end="")
         for n in N_LIST:
-            scores = res.get(str(n), [])
+            scores = res.get(str(n), {}).get("macro_f1", [])
+            if scores:
+                print(f"  {np.mean(scores):.3f}±{np.std(scores):.3f}", end="")
+            else:
+                print(f"  {'—':>9}", end="")
+        print()
+
+    print("\n--- Summary (micro-F1 mean ± std) ---")
+    print(f"{'Condition':<15}", end="")
+    for n in N_LIST:
+        print(f"  N={n:<5}", end="")
+    print()
+    for cond, res in all_results.items():
+        print(f"{cond:<15}", end="")
+        for n in N_LIST:
+            scores = res.get(str(n), {}).get("micro_f1", [])
             if scores:
                 print(f"  {np.mean(scores):.3f}±{np.std(scores):.3f}", end="")
             else:
