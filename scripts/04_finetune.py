@@ -36,7 +36,7 @@ def load_encoder(path, ckpt_type):
     else:  # h_mlm
         ckpt      = torch.load(path, map_location=DEVICE)
         tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
-        encoder   = RobertaModel.from_pretrained("distilroberta-base")
+        encoder   = RobertaModel.from_pretrained("distilroberta-base", add_pooling_layer=False)
         encoder.load_state_dict(ckpt["encoder_state"])
         encoder   = encoder.to(DEVICE)
         attn_pool = AttentionPooling(dim=768, max_chunks=50).to(DEVICE)
