@@ -9,7 +9,7 @@ from transformers import get_linear_schedule_with_warmup
 import sys
 
 sys.path.append(".")
-from src.data import load_ecthr, mask_paragraphs, truncate_paragraphs
+from src.data import load_ecthr, mask_paragraphs, get_paragraph_mask
 from src.model import GlocalIBModel
 from src.loss import glocal_ib_loss
 
@@ -36,14 +36,14 @@ class GlocalDataset(Dataset):
     def __getitem__(self, idx):
         raw_text = self.dataset[idx]["text"]
         # 1. Truncate and get indices
-        full_paras, full_indices = truncate_paragraphs(raw_text, max_chunks=50)
-        # 2. Mask paragraphs (relative to the truncated list)
+        # load_ecthr filters to ≤50 paragraphs — no truncation needed
+        full_paras = raw_text
         masked_paras, kept_indices = mask_paragraphs(full_paras)
-        
+
         return {
-            "full_batch_data": (full_paras, full_indices),
+            "full_batch_data": (full_paras, list(range(len(full_paras)))),
             "masked_batch": masked_paras,
-            "indices_batch": kept_indices
+            "indices_batch": kept_indices,
         }
 
 

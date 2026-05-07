@@ -7,7 +7,7 @@ from transformers import RobertaForMaskedLM, RobertaTokenizerFast, DataCollatorF
 import sys
 
 sys.path.append(".")
-from src.data import load_ecthr, truncate_paragraphs
+from src.data import load_ecthr
 
 # --- CONFIG ---
 EPOCHS     = 3
@@ -32,8 +32,8 @@ def train():
         # To be fair, we must ensure it only sees the SAME 50 paragraphs.
         processed_texts = []
         for doc_paragraphs in examples["text"]:
-            truncated = truncate_paragraphs(doc_paragraphs, max_chunks=50)
-            processed_texts.append(" ".join(truncated))
+            # load_ecthr already filters to ≤50 paragraphs — no truncation needed
+            processed_texts.append(" ".join(doc_paragraphs))
             
         return tokenizer(processed_texts, truncation=True, padding="max_length", max_length=512)
 

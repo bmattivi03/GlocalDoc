@@ -12,7 +12,7 @@ from transformers import (
 import sys
 
 sys.path.append(".")
-from src.data import load_ecthr, truncate_paragraphs
+from src.data import load_ecthr
 
 # --- CONFIG ---
 EPOCHS = 3
@@ -35,13 +35,9 @@ def train():
     dataset = load_ecthr()
     
     def tokenize_function(examples):
-        # Apply same truncation as Glocal
-        # FIX: truncate_paragraphs returns (paragraphs, indices)
-        truncated_results = [truncate_paragraphs(doc, max_chunks=DOC_MAX_CHUNKS) for doc in examples["text"]]
-        
-        # Flatten into segments of MAX_LENGTH
+        # load_ecthr filters to ≤50 paragraphs — no truncation needed
         all_segments = []
-        for paras, _ in truncated_results:
+        for paras in examples["text"]:
             full_text = " ".join(paras)
             # FIX: Tokenize without special tokens, chunk, then add special tokens manually
             # This ensures every chunk has a [CLS] token for the classifier to use.

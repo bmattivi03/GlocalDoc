@@ -1,42 +1,90 @@
+import re
 import random
 from datasets import load_dataset
 
 
-def load_ecthr(min_paragraphs=5):
-    """Load ECtHR dataset and filter out documents with fewer than min_paragraphs."""
+def load_ecthr(min_paragraphs: int = 5, max_paragraphs: int = 50):
+    """Load ECtHR and filter to documents with 5–50 paragraphs."""
     dataset = load_dataset("coastalcph/lex_glue", "ecthr_a")
-    dataset = dataset.filter(lambda x: len(x["text"]) >= min_paragraphs)
-    return dataset
+    return dataset.filter(lambda x: min_paragraphs <= len(x["text"]) <= max_paragraphs)
 
 
-def truncate_paragraphs(paragraphs, max_chunks=50):
-    """Head-tail truncation: keeps first and last N/2 paragraphs. Returns (paras, indices)."""
-    n = len(paragraphs)
-    if n <= max_chunks:
-        return paragraphs, list(range(n))
-    
-    half = max_chunks // 2
-    first_half = list(range(half))
-    last_half  = list(range(n - half, n))
-    
-    indices = first_half + last_half
-    return [paragraphs[i] for i in indices], indices
+def mask_text(
+    paragraph: str,
+    sent_dropout: float = 0.20,
+    span_rate: float = 0.15,
+    span_len_min: int = 3,
+    span_len_max: int = 5,
+) -> str:
+    """
+    Two-stage masking applied to a single paragraph string.
+
+    Stage 1 — sentence dropout (20%): split on sentence boundaries, drop each
+    sentence independently with probability sent_dropout. If all sentences are
+    dropped, return original paragraph unchanged.
+
+    Stage 2 — span masking (15%, spans 3–5 words): sample word-level spans until
+    ~15% of words are covered. Replace each span with a single '<mask>' token.
+    Consecutive '<mask>' tokens are collapsed to one.
+
+    '<mask>' is the RoBERTa mask token and is handled correctly by
+    RobertaTokenizerFast without special treatment.
+    """
+    # Stage 1: sentence dropout
+    sentences = re.split(r'(?<=[.!?])\s+', paragraph.strip())
+    kept = [s for s in sentences if random.random() > sent_dropout]
+    if not kept:
+        kept = sentences
+    text = ' '.join(kept)
+
+    # Stage 2: word-level span masking
+    words = text.split()
+    if not words:
+        return paragraph
+
+    n_to_mask = max(1, round(len(words) * span_rate))
+    masked_positions: set = set()
+    attempts = 0
+    while len(masked_positions) < n_to_mask and attempts < len(words) * 3:
+        attempts += 1
+        start = random.randint(0, len(words) - 1)
+        span = random.randint(span_len_min, span_len_max)
+        for j in range(start, min(start + span, len(words))):
+            masked_positions.add(j)
+
+    result = []
+    prev_mask = False
+    for i, w in enumerate(words):
+        if i in masked_positions:
+            if not prev_mask:
+                result.append('<mask>')
+            prev_mask = True
+        else:
+            result.append(w)
+            prev_mask = False
+
+    return ' '.join(result)
 
 
-def mask_paragraphs(paragraphs, mask_ratio_min=0.2, mask_ratio_max=0.4):
-    """Randomly drop 20–40% of paragraphs. Always keeps at least 1."""
+def get_paragraph_mask(n_paragraphs: int, dropout_rate: float = 0.30) -> list:
+    """Return sorted list of kept paragraph indices after dropping dropout_rate fraction."""
+    n_keep = max(1, round(n_paragraphs * (1 - dropout_rate)))
+    return sorted(random.sample(range(n_paragraphs), n_keep))
+
+
+def mask_paragraphs(paragraphs: list, mask_ratio_min: float = 0.2, mask_ratio_max: float = 0.4):
+    """Legacy API: paragraph-level dropout. Returns (kept_paragraphs, kept_indices)."""
     n = len(paragraphs)
     mask_ratio = random.uniform(mask_ratio_min, mask_ratio_max)
     n_keep = max(1, int(n * (1 - mask_ratio)))
     indices = sorted(random.sample(range(n), n_keep))
-    # Return both the masked text and the indices of the kept paragraphs
     return [paragraphs[i] for i in indices], indices
 
 
-def sample_few_shot(dataset_split, n_per_class, seed, num_classes=10):
+def sample_few_shot(dataset_split, n_per_class: int, seed: int, num_classes: int = 10):
     """
-    Sample indices such that each class has at least n_per_class examples.
-    Documents can satisfy multiple classes (multi-label). Deduplicates.
+    Multi-label aware few-shot sampling. Ensures n_per_class examples per label.
+    Deduplicates documents that satisfy multiple classes.
     """
     rng = random.Random(seed)
     per_class = [[] for _ in range(num_classes)]

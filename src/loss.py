@@ -3,56 +3,41 @@ import torch.nn.functional as F
 
 
 def alignment_loss(z1: torch.Tensor, z2: torch.Tensor) -> torch.Tensor:
-    """1 − mean cosine similarity. Inputs: (N, D)."""
-    if z1.dim() == 3:
-        z1 = z1.view(-1, z1.size(-1))
-        z2 = z2.view(-1, z2.size(-1))
-    # FIX: Ensure we are not comparing a tensor to itself (done in model.py by using different passes)
+    """1 − mean cosine similarity. z1, z2: (N, D)."""
     return 1.0 - F.cosine_similarity(z1, z2, dim=-1).mean()
 
 
-def compression_loss(mu: torch.Tensor, log_sigma: torch.Tensor) -> torch.Tensor:
-    """KL( N(mu, exp(log_sigma)²) ∥ N(0,1) ) — closed form. Inputs: (B, H)."""
-    return -0.5 * torch.sum(
-        1 + 2 * log_sigma - mu.pow(2) - torch.exp(2 * log_sigma), dim=-1
-    ).mean()
+def compression_loss(mu: torch.Tensor, sigma: torch.Tensor) -> torch.Tensor:
+    """KL( N(mu, sigma²) ∥ N(0,1) ) closed form. mu, sigma: (B, H)."""
+    return -0.5 * (1 + 2 * torch.log(sigma) - mu.pow(2) - sigma.pow(2)).sum(-1).mean()
 
 
 def glocal_ib_loss(
-    Z_prime:     torch.Tensor,           # (B, 768) — teacher full doc
-    Z_proj:      torch.Tensor,           # (B, 768) — student IB projection
-    Z_inter_s:   torch.Tensor,           # (B, 768) — student partial aggregate
-    Z_inter_t:   torch.Tensor,           # (B, 768) — teacher partial aggregate
-    chunks_s:    list,                   # list[Tensor(M, 768)]
-    chunks_t:    list,                   # list[Tensor(M, 768)]
-    mu:          torch.Tensor,           # (B, 256)
-    log_sigma:   torch.Tensor,           # (B, 256)
-    log_s:       torch.Tensor,           # (3,)  learnable (local, inter, global)
-    beta:        float = 1e-4,           # Fixed IB trade-off
-    disable_ib:  bool = False,
+    Z_prime:   torch.Tensor,   # (B, 768) teacher full-doc
+    Z_proj:    torch.Tensor,   # (B, 768) student post-IB
+    z_partial: torch.Tensor,   # (B, 768) student pre-IB (for L_inter)
+    s_chunks:  list,           # list[Tensor(N, 768)] student all-para reps
+    t_chunks:  list,           # list[Tensor(N, 768)] teacher all-para reps
+    mu:        torch.Tensor,   # (B, 256)
+    sigma:     torch.Tensor,   # (B, 256)
+    log_s:     torch.Tensor,   # (4,) clamped UW weights [compress, local, inter, global]
 ):
     """
-    Four-component hierarchical GlocalIB loss.
-    Compression is fixed (beta), while alignments use uncertainty weighting.
+    Four-component hierarchical GlocalIB loss with homoscedastic uncertainty weighting.
+
+    L_compress  KL penalty — forces IB bottleneck to compress
+    L_local     align all N paragraph pairs (teacher_i vs student_i)
+    L_inter     align student partial pool vs teacher full doc (pre-IB gradient path)
+    L_global    align student IB projection vs teacher full doc (post-IB)
+
+    Returns (total, l_compress, l_local, l_inter, l_global).
     """
-    l_compress = compression_loss(mu, log_sigma)
-    l_local    = alignment_loss(torch.cat(chunks_s), torch.cat(chunks_t))
-    l_inter    = alignment_loss(Z_inter_s, Z_inter_t)
-    l_global   = alignment_loss(Z_proj, Z_prime)
+    l_compress = compression_loss(mu, sigma)
+    l_local    = alignment_loss(torch.cat(s_chunks), torch.cat(t_chunks))
+    l_inter    = alignment_loss(z_partial, Z_prime.detach())
+    l_global   = alignment_loss(Z_proj,    Z_prime.detach())
 
-    if disable_ib:
-        # FIX: Ensure all modules receive a gradient (even if 0) to satisfy DDP and prevent crashes.
-        # This keeps predictors and heads in the graph even when they don't contribute to the primary loss.
-        dummy_loss = 0.0 * (log_s.sum() + l_local + l_inter + l_compress)
-        return l_global + dummy_loss, l_compress.detach(), l_local.detach(), l_inter.detach(), l_global
-
-    # Homoscedastic uncertainty weighting for the THREE alignment terms.
-    # FIX: Remove hard clamp to prevent dead gradients.
-    safe_log_s = log_s
-    align_losses = torch.stack([l_local, l_inter, l_global])
-    weighted_align = (0.5 * align_losses * torch.exp(-safe_log_s) + 0.5 * safe_log_s).sum()
-
-    # IB total: weighted_align + beta * l_compress
-    total = weighted_align + beta * l_compress
+    losses = torch.stack([l_compress, l_local, l_inter, l_global])
+    total  = (losses * torch.exp(-log_s) + log_s).sum()
 
     return total, l_compress, l_local, l_inter, l_global
