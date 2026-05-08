@@ -76,6 +76,7 @@ def train():
 
     tokenizer   = RobertaTokenizerFast.from_pretrained("distilroberta-base")
     model       = RobertaForMaskedLM.from_pretrained("distilroberta-base")
+    model.gradient_checkpointing_enable()
     attn_pool   = AttentionPooling(dim=768, max_chunks=50)
     mlm_collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer, mlm_probability=0.15, return_tensors="pt"

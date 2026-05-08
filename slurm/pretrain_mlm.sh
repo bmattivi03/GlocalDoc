@@ -12,5 +12,6 @@
 source ~/.bashrc
 conda activate glocal_nlp
 cd /path/to/GlocalDoc               # ← update before submitting
+mkdir -p logs
 
 accelerate launch --num_processes=4 scripts/03_pretrain_mlm.py

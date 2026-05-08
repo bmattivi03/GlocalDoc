@@ -10,5 +10,6 @@
 source ~/.bashrc
 conda activate glocal_nlp
 cd /path/to/GlocalDoc               # ← update before submitting
+mkdir -p logs
 
 python scripts/04_finetune.py
