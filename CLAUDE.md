@@ -104,7 +104,7 @@ Hierarchical MLM inspired by SMITH (Yang et al. ACL 2020). Processes all N parag
 - **L_mlm**: Standard 15% masked token prediction per paragraph via `DataCollatorForLanguageModeling`
 - **L_para_pred**: `alignment_loss(attn_pool(M kept para reps), stop-grad mean of all N para reps)` — trains `AttentionPooling` to reconstruct the full document from a partial view
 
-Jointly pre-trains encoder + `AttentionPooling`. At fine-tune time, both the encoder and the pooling module are loaded from the H-MLM checkpoint (unlike vanilla MLM which would leave the attention pool randomly initialized).
+Jointly pre-trains encoder + `AttentionPooling`. `gradient_checkpointing_enable()` is called on the `RobertaForMaskedLM` model (matching `GlocalIBModel`). At fine-tune time, both the encoder and the pooling module are loaded from the H-MLM checkpoint (unlike vanilla MLM which would leave the attention pool randomly initialized).
 
 ### Data flow through training
 
@@ -122,7 +122,9 @@ Jointly pre-trains encoder + `AttentionPooling`. At fine-tune time, both the enc
 **H-MLM** (`scripts/03_pretrain_mlm.py`) saves per epoch:
 - `checkpoints/h_mlm_epoch{N}.pt` — dict `{"encoder_state": roberta_state, "attn_pool_state": attn_pool_state}`
 
-Fine-tuning (`scripts/04_finetune.py`) loads H-MLM encoder with `RobertaModel.from_pretrained("distilroberta-base", add_pooling_layer=False)` because `RobertaForMaskedLM` saves the encoder without the pooler layer.
+Fine-tuning (`scripts/04_finetune.py`) loads H-MLM encoder with `RobertaModel.from_pretrained("distilroberta-base", add_pooling_layer=False)` because `RobertaForMaskedLM` saves the encoder without the pooler layer. `load_encoder()` is called once per condition; the returned weights are snapshotted and restored before every `run_few_shot` call so all 15 seed×N runs start from identical pre-trained weights.
+
+**`archive/`** contains the original root-level `train_glocal.py` and `train_mlm.py`. These use a deprecated API (`mask_paragraphs`, old `glocal_ib_loss` signatures) and are incompatible with the current checkpoints. Do not use them.
 
 ## src/ API
 
@@ -161,6 +163,7 @@ Fine-tuning: N ∈ {10, 50, 100} × 5 seeds. Results saved to `results/finetunin
 - Teacher/student encoding passes are sequential — never simultaneous — to minimize peak VRAM.
 - `log_s` clamped to `[-10, 10]` in every forward pass (prevents numerical explosion).
 - `update_teacher_ema()` must be called after every `optimizer.step()` — not inside `forward`.
+- Both pre-training scripts use `get_linear_schedule_with_warmup` with 10% warmup steps over total training steps. GlocalIB LR=1e-5, H-MLM LR=5e-5. The schedulers are `accelerator.prepare()`d alongside the optimizer.
 - If all four `log_s` stay near 0 through epoch 2, UW is degenerate — flag it, don't ignore.
 - `scripts/` contains standalone Python equivalents of all notebooks (SSH/cluster friendly). Notebooks in `notebooks/` are kept for interactive use.
 
