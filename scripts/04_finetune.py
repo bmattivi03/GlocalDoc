@@ -121,11 +121,15 @@ def main():
 
         print(f"\n=== Condition: {cond} ===")
         encoder, tokenizer, attn_pool = load_encoder(path, ckpt_type)
+        encoder_state_init   = {k: v.cpu().clone() for k, v in encoder.state_dict().items()}
+        attn_pool_state_init = {k: v.cpu().clone() for k, v in attn_pool.state_dict().items()}
         all_results[cond] = {}
 
         for n in N_LIST:
             macro_scores, micro_scores = [], []
             for seed in SEEDS:
+                encoder.load_state_dict(encoder_state_init)
+                attn_pool.load_state_dict(attn_pool_state_init)
                 metrics = run_few_shot(
                     encoder, tokenizer, attn_pool,
                     dataset["train"], dataset["validation"], dataset["test"],

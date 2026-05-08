@@ -103,25 +103,26 @@ def train():
         for doc_batch in loader:
             paragraphs = doc_batch[0]   # BATCH_SIZE=1 → single document
 
-            # === L_mlm: per-paragraph 15% token masking ===
-            para_ids  = [
-                {"input_ids": tokenizer.encode(p, truncation=True, max_length=512)}
-                for p in paragraphs
-            ]
-            mlm_batch = {k: v.to(device) for k, v in mlm_collator(para_ids).items()}
-            l_mlm     = accelerator.unwrap_model(model)(**mlm_batch).loss
-
-            # === L_para_pred: partial → full document alignment ===
-            l_para = compute_para_pred_loss(
-                accelerator.unwrap_model(model),
-                tokenizer,
-                accelerator.unwrap_model(attn_pool),
-                paragraphs,
-            )
-
-            total = ALPHA * l_mlm + (1.0 - ALPHA) * l_para
-
             with accelerator.accumulate(model, attn_pool):
+                # === L_mlm: per-paragraph 15% token masking ===
+                para_ids  = [
+                    {"input_ids": tokenizer.encode(p, truncation=True, max_length=512)}
+                    for p in paragraphs
+                ]
+                mlm_batch = {k: v.to(device) for k, v in mlm_collator(para_ids).items()}
+                l_mlm     = model(**mlm_batch).loss
+
+                # === L_para_pred: partial → full document alignment ===
+                # unwrap_model used only for .roberta attribute access (teacher + student encoder)
+                # attn_pool passed as DDP-wrapped so its gradients are all-reduced correctly
+                l_para = compute_para_pred_loss(
+                    accelerator.unwrap_model(model),
+                    tokenizer,
+                    attn_pool,
+                    paragraphs,
+                )
+
+                total = ALPHA * l_mlm + (1.0 - ALPHA) * l_para
                 accelerator.backward(total)
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(
