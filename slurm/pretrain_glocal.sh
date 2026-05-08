@@ -13,5 +13,5 @@ source ~/.bashrc
 conda activate glocal_nlp
 cd /path/to/GlocalDoc               # ← update before submitting
 
-# Edit CONDITION in train_glocal.py before each run
-accelerate launch --num_processes=4 train_glocal.py
+# Edit CONDITION at top of scripts/02_pretrain_glocal.py before each run
+accelerate launch --num_processes=4 scripts/02_pretrain_glocal.py

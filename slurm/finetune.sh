@@ -11,6 +11,4 @@ source ~/.bashrc
 conda activate glocal_nlp
 cd /path/to/GlocalDoc               # ← update before submitting
 
-jupyter nbconvert --to notebook --execute notebooks/04_finetune.ipynb \
-    --output notebooks/04_finetune_executed.ipynb \
-    --ExecutePreprocessor.timeout=86400
+python scripts/04_finetune.py
