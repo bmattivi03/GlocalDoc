@@ -2,6 +2,7 @@ import torch
 import wandb
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
+from transformers import get_linear_schedule_with_warmup
 from accelerate import Accelerator
 import sys
 
@@ -45,12 +46,17 @@ def train():
 
     dataset = load_ecthr()
     model   = GlocalIBModel(ema_tau=EMA_TAU, device=str(device))
-    opt     = AdamW(model.parameters(), lr=LR)
 
     loader = DataLoader(
         dataset["train"], batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_fn
     )
-    model, opt, loader = accelerator.prepare(model, opt, loader)
+
+    total_steps  = (len(loader) // GRAD_ACCUM) * EPOCHS
+    warmup_steps = max(1, total_steps // 10)
+    opt          = AdamW(model.parameters(), lr=LR)
+    scheduler    = get_linear_schedule_with_warmup(opt, warmup_steps, total_steps)
+
+    model, opt, loader, scheduler = accelerator.prepare(model, opt, loader, scheduler)
 
     global_step = 0
     for epoch in range(EPOCHS):
@@ -76,6 +82,7 @@ def train():
                     accelerator.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
 
                 opt.step()
+                scheduler.step()
                 opt.zero_grad()
 
                 # EMA update after optimizer step — attention pooling only
@@ -96,6 +103,7 @@ def train():
                         "log_s_local":    log_s[1].item(),
                         "log_s_inter":    log_s[2].item(),
                         "log_s_global":   log_s[3].item(),
+                        "lr":             scheduler.get_last_lr()[0],
                         "epoch":          epoch,
                         "step":           global_step,
                     })
