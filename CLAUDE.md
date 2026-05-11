@@ -6,7 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MSc research at Free University of Bozen-Bolzano (2026). Adapts the GlocalIB (Global-Local Information Bottleneck) objective to few-shot legal document classification on the ECtHR dataset (`coastalcph/lex_glue / ecthr_a`). The core hypothesis: compressing masked-document representations through an explicit IB bottleneck produces better few-shot features than standard MLM pre-training.
 
-Full architecture spec and rationale: `doc/PLAN.md`. Task status: `doc/TODO.md`.
+**`doc/PLAN.md` and `doc/TODO.md` are stale** — they reference removed files (`train_glocal.py`, `train_mlm.py`), a non-existent `glocal_beta0` ablation condition, and an old `glocal_ib_loss(disable_ib=...)` signature. Trust CLAUDE.md over those files.
+
+## Environment
+
+```bash
+conda activate glocal_nlp   # Python 3.10 environment
+# Fresh setup:
+# conda create -n glocal_nlp python=3.10
+# conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+# pip install -r requirements.txt
+```
 
 ## Common Commands
 
@@ -164,6 +174,7 @@ Fine-tuning: N ∈ {10, 50, 100} × 5 seeds. Results saved to `results/finetunin
 - `log_s` clamped to `[-10, 10]` in every forward pass (prevents numerical explosion).
 - `update_teacher_ema()` must be called after every `optimizer.step()` — not inside `forward`.
 - Both pre-training scripts use `get_linear_schedule_with_warmup` with 10% warmup steps over total training steps. GlocalIB LR=1e-5, H-MLM LR=5e-5. The schedulers are `accelerator.prepare()`d alongside the optimizer.
+- Before submitting SLURM jobs, update `cd /path/to/GlocalDoc` in all three `slurm/*.sh` scripts to the actual cluster path. Also confirm the `spark` partition name with the lab admin.
 - If all four `log_s` stay near 0 through epoch 2, UW is degenerate — flag it, don't ignore.
 - `scripts/` contains standalone Python equivalents of all notebooks (SSH/cluster friendly). Notebooks in `notebooks/` are kept for interactive use.
 
