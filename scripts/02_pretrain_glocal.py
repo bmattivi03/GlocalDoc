@@ -93,12 +93,18 @@ def train():
                 global_step += 1
                 if global_step % 10 == 0 and accelerator.is_main_process:
                     log_s = out[7].detach().float()
+                    weights = torch.exp(-log_s)   # UW per-loss multiplier
                     wandb.log({
                         "total_loss":     total.item(),
                         "l_compress":     lc.item(),
                         "l_local":        ll.item(),
                         "l_inter":        li.item(),
                         "l_global":       lg.item(),
+                        # UW contributions — detect degeneracy if any stay flat near raw loss
+                        "uw_contrib_compress": (lc * weights[0]).item(),
+                        "uw_contrib_local":    (ll * weights[1]).item(),
+                        "uw_contrib_inter":    (li * weights[2]).item(),
+                        "uw_contrib_global":   (lg * weights[3]).item(),
                         "log_s_compress": log_s[0].item(),
                         "log_s_local":    log_s[1].item(),
                         "log_s_inter":    log_s[2].item(),
@@ -108,9 +114,11 @@ def train():
                         "step":           global_step,
                     })
 
+        accelerator.wait_for_everyone()
+        # save_state is collective — must be called on all ranks
+        accelerator.save_state(f"checkpoints/{CONDITION}_epoch{epoch}")
         if accelerator.is_main_process:
             print(f"Epoch {epoch} done.")
-            accelerator.save_state(f"checkpoints/{CONDITION}_epoch{epoch}")
             torch.save(
                 accelerator.unwrap_model(model).state_dict(),
                 f"checkpoints/{CONDITION}_epoch{epoch}.pt",

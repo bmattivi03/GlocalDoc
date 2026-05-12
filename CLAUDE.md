@@ -114,7 +114,7 @@ Hierarchical MLM inspired by SMITH (Yang et al. ACL 2020). Processes all N parag
 - **L_mlm**: Standard 15% masked token prediction per paragraph via `DataCollatorForLanguageModeling`
 - **L_para_pred**: `alignment_loss(attn_pool(M kept para reps), stop-grad mean of all N para reps)` — trains `AttentionPooling` to reconstruct the full document from a partial view
 
-Jointly pre-trains encoder + `AttentionPooling`. `gradient_checkpointing_enable()` is called on the `RobertaForMaskedLM` model (matching `GlocalIBModel`). At fine-tune time, both the encoder and the pooling module are loaded from the H-MLM checkpoint (unlike vanilla MLM which would leave the attention pool randomly initialized).
+The encoder + attention pool are bundled into a single `HMLMTrainer(nn.Module)` defined inside `scripts/03_pretrain_mlm.py` and passed to `accelerator.prepare()`. Both the MLM forward and the two `roberta(...)` passes that compute L_para_pred happen inside that wrapper's `forward()`, so DDP all-reduces every parameter's gradients and mixed-precision autocast covers all encoder calls — never call `accelerator.unwrap_model(...)` for forward; only for saving state. `gradient_checkpointing_enable()` is called on the `RobertaForMaskedLM` model (matching `GlocalIBModel`). At fine-tune time, both the encoder and the pooling module are loaded from the H-MLM checkpoint (unlike vanilla MLM which would leave the attention pool randomly initialized).
 
 ### Data flow through training
 
@@ -147,22 +147,23 @@ Fine-tuning (`scripts/04_finetune.py`) loads H-MLM encoder with `RobertaModel.fr
 
 **`src/model.py`**
 - `GlocalIBModel(hidden_dim=256, proj_dim=512, max_paragraphs=50, ema_tau=0.99, device="cuda")`
-  - forward: `(full_batch, masked_batch, kept_indices_batch)` → 8-tuple `(Z_prime, Z_proj, z_partial, s_chunks, t_chunks, mu, sigma, log_s)`
+  - forward: `(full_batch, masked_batch, kept_indices_batch)` → 8-tuple `(Z_prime, Z_proj, z_partial, s_chunks, t_chunks, mu, log_sigma, log_s)` — note 7th element is `log_sigma` (clamped to `[-10, 10]`), not `sigma`, so KL stays stable under bf16
+  - teacher attention pool is initialized from the student at construction so all DDP ranks start identical
   - `update_teacher_ema()` — call after every optimizer step
-- `DocumentClassifier(encoder, tokenizer, attn_pool, num_labels=10, max_paragraphs=50, device="cuda")` — forward: `(paragraphs_batch)` → `(B, 10)` sigmoid; uses CLS token, not pooler output
+- `DocumentClassifier(encoder, tokenizer, attn_pool, num_labels=10, max_paragraphs=50, device="cuda")` — forward: `(paragraphs_batch)` → `(B, 10)` **raw logits**; pair with `BCEWithLogitsLoss` at train, apply `sigmoid` at eval
 - `AttentionPooling(dim=768, max_chunks=50)` — learnable query + positional embeddings, zero-init → starts as mean pooling
 
 **`src/loss.py`**
-- `glocal_ib_loss(Z_prime, Z_proj, z_partial, s_chunks, t_chunks, mu, sigma, log_s)` → `(total, l_compress, l_local, l_inter, l_global)`
+- `glocal_ib_loss(Z_prime, Z_proj, z_partial, s_chunks, t_chunks, mu, log_sigma, log_s)` → `(total, l_compress, l_local, l_inter, l_global)`
 - `alignment_loss(z1, z2)` — `1 − mean cosine similarity`, expects `(N, D)` tensors
-- `compression_loss(mu, sigma)` — KL divergence closed form
+- `compression_loss(mu, log_sigma)` — KL divergence closed form, computed directly from `log_sigma` to stay finite under bf16
 
 ## Experimental Conditions
 
 | Condition | Pre-training | Key difference |
 |-----------|-------------|----------------|
 | `glocal_ib` | 4-loss IB + UW + EMA attention | IB bottleneck forces compression |
-| `mlm` (H-MLM) | Per-paragraph MLM + paragraph prediction | No IB; pre-trains same attention pool |
+| `h_mlm` | Per-paragraph MLM + paragraph prediction | No IB; pre-trains same attention pool |
 
 Fine-tuning: N ∈ {10, 50, 100} × 5 seeds. Results saved to `results/finetuning_results.json` as `{condition: {N: {"macro_f1": [...], "micro_f1": [...]}}}`. **Primary metric: macro-F1** (class imbalance is severe: label 3 has 4704 training examples, label 5 has 41). Micro-F1 reported as secondary metric.
 
@@ -175,7 +176,9 @@ Fine-tuning: N ∈ {10, 50, 100} × 5 seeds. Results saved to `results/finetunin
 - `update_teacher_ema()` must be called after every `optimizer.step()` — not inside `forward`.
 - Both pre-training scripts use `get_linear_schedule_with_warmup` with 10% warmup steps over total training steps. GlocalIB LR=1e-5, H-MLM LR=5e-5. The schedulers are `accelerator.prepare()`d alongside the optimizer.
 - Before submitting SLURM jobs, update `cd /path/to/GlocalDoc` in all three `slurm/*.sh` scripts to the actual cluster path. Also confirm the `spark` partition name with the lab admin.
-- If all four `log_s` stay near 0 through epoch 2, UW is degenerate — flag it, don't ignore.
+- If all four `log_s` stay near 0 through epoch 2, UW is degenerate — flag it, don't ignore. The W&B run also logs `uw_contrib_{compress,local,inter,global}` (raw loss × UW multiplier) to make this visible.
+- Fine-tune `run_few_shot` calls `seed_everything(seed)` *before* sampling and *before* constructing the `DocumentClassifier`. Without this, the classifier head's `nn.Linear` init doesn't depend on `seed` and the 5 "seeds" collapse to varying only the sampled few-shot set.
+- SLURM scripts use `ntasks-per-node=1` because `accelerate launch --num_processes=N` spawns its own worker processes. Using `ntasks-per-node=N` produces N×N processes fighting over N GPUs.
 - `scripts/` contains standalone Python equivalents of all notebooks (SSH/cluster friendly). Notebooks in `notebooks/` are kept for interactive use.
 
 ## Compute
