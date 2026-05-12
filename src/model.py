@@ -36,7 +36,13 @@ class GlocalIBModel(nn.Module):
         self.tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
         # Single shared encoder. Teacher pass uses stop-grad; student pass trains it.
         self.encoder   = RobertaModel.from_pretrained("distilroberta-base")
-        self.encoder.gradient_checkpointing_enable()
+        # use_reentrant=False is required: the encoder is called twice per forward
+        # (teacher under no_grad, student with grad), and the legacy reentrant
+        # autograd hook misaligns saved-vs-recomputed tensors under fp16+GradScaler.
+        self.encoder.gradient_checkpointing_enable(
+            gradient_checkpointing_kwargs={"use_reentrant": False}
+        )
+        self.encoder.config.use_cache = False
 
         # Separate attention pools: student trains via gradient, teacher updated via EMA.
         self.attn_pool_student = AttentionPooling(dim=768, max_chunks=max_paragraphs)

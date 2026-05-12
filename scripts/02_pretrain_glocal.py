@@ -1,10 +1,18 @@
+import os
+os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")  # silence unauth-request warning
+
 import torch
 import wandb
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
+import transformers
 from transformers import get_linear_schedule_with_warmup
 from accelerate import Accelerator
 import sys
+
+# Suppress benign per-paragraph warnings (long tokens are sub-chunked manually,
+# use_cache is explicitly disabled alongside gradient checkpointing).
+transformers.logging.set_verbosity_error()
 
 sys.path.append(".")
 from src.data import load_ecthr, mask_text, get_paragraph_mask
@@ -14,7 +22,7 @@ from src.loss import glocal_ib_loss
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 EPOCHS        = 5
 BATCH_SIZE    = 1       # per GPU; effective = BATCH_SIZE × num_GPUs × GRAD_ACCUM
-GRAD_ACCUM    = 4
+GRAD_ACCUM    = 8
 LR            = 1e-5
 MAX_GRAD_NORM = 1.0
 EMA_TAU       = 0.99
@@ -29,7 +37,7 @@ def collate_fn(batch):
 
 def train():
     accelerator = Accelerator(
-        mixed_precision="bf16",
+        mixed_precision="fp16",
         gradient_accumulation_steps=GRAD_ACCUM,
     )
     device = accelerator.device
@@ -91,7 +99,7 @@ def train():
 
             if accelerator.sync_gradients:
                 global_step += 1
-                if global_step % 10 == 0 and accelerator.is_main_process:
+                if global_step % 1 == 0 and accelerator.is_main_process:
                     log_s = out[7].detach().float()
                     weights = torch.exp(-log_s)   # UW per-loss multiplier
                     wandb.log({
@@ -111,6 +119,7 @@ def train():
                         "log_s_global":   log_s[3].item(),
                         "lr":             scheduler.get_last_lr()[0],
                         "epoch":          epoch,
+                        "progress":       accelerator.get_progress_bar_dict()["progress"],
                         "step":           global_step,
                     })
 

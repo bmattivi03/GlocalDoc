@@ -1,8 +1,11 @@
 import os
+os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")  # silence unauth-request warning
+
 import torch
 import torch.nn as nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
+import transformers
 from transformers import (
     RobertaForMaskedLM, RobertaTokenizerFast,
     DataCollatorForLanguageModeling,
@@ -10,6 +13,8 @@ from transformers import (
 )
 from accelerate import Accelerator
 import sys
+
+transformers.logging.set_verbosity_error()
 
 sys.path.append(".")
 from src.data import load_ecthr, get_paragraph_mask
@@ -101,7 +106,12 @@ def train():
 
     tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
     encoder_mlm = RobertaForMaskedLM.from_pretrained("distilroberta-base")
-    encoder_mlm.gradient_checkpointing_enable()
+    # use_reentrant=False: encoder is called 3× per forward (MLM + teacher no_grad + student),
+    # and the legacy reentrant hook breaks under fp16+GradScaler on Titan Xp.
+    encoder_mlm.gradient_checkpointing_enable(
+        gradient_checkpointing_kwargs={"use_reentrant": False}
+    )
+    encoder_mlm.config.use_cache = False
     attn_pool = AttentionPooling(dim=768, max_chunks=50)
 
     trainer = HMLMTrainer(encoder_mlm, attn_pool)
