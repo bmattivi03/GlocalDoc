@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import random
 import torch
 import numpy as np
 from torch.optim import AdamW
@@ -23,8 +24,16 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 CONDITIONS = {
     "glocal_ib": ("checkpoints/glocal_ib_epoch4.pt", "glocal"),
-    "mlm":       ("checkpoints/h_mlm_epoch3.pt",      "h_mlm"),
+    "h_mlm":     ("checkpoints/h_mlm_epoch3.pt",     "h_mlm"),
 }
+
+
+def seed_everything(seed: int):
+    """Seed all RNGs that affect classifier-head init, dropout, and data shuffles."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
 def load_encoder(path, ckpt_type):
@@ -45,10 +54,16 @@ def load_encoder(path, ckpt_type):
 
 
 def run_few_shot(encoder, tokenizer, attn_pool, train_split, val_split, test_split, n, seed):
+    # Seed everything BEFORE constructing DocumentClassifier so the classifier
+    # head's nn.Linear init actually depends on `seed`. Without this, the 5 seeds
+    # would only vary which few-shot examples are sampled, not the head init.
+    seed_everything(seed)
+
     few_shot  = sample_few_shot(train_split, n, seed)
     clf       = DocumentClassifier(encoder, tokenizer, attn_pool=attn_pool, device=DEVICE)
     opt       = AdamW(clf.parameters(), lr=LR)
-    criterion = torch.nn.BCELoss()
+    # BCEWithLogitsLoss — numerically stable with raw logits (DocumentClassifier returns logits).
+    criterion = torch.nn.BCEWithLogitsLoss()
 
     total_steps  = FINETUNE_EPOCHS * len(few_shot)
     warmup_steps = max(1, total_steps // 10)
@@ -61,12 +76,12 @@ def run_few_shot(encoder, tokenizer, attn_pool, train_split, val_split, test_spl
         clf.train()
         for ex in few_shot:
             opt.zero_grad()
-            probs  = clf([ex["text"]])           # (1, 10) — sigmoid probabilities
+            logits = clf([ex["text"]])           # (1, 10) — raw logits
             labels = torch.zeros(1, 10, device=DEVICE)
             for lbl in ex["labels"]:
                 if lbl < 10:
                     labels[0][lbl] = 1.0
-            loss = criterion(probs, labels)
+            loss = criterion(logits, labels)
             loss.backward()
             opt.step()
             scheduler.step()
@@ -76,8 +91,8 @@ def run_few_shot(encoder, tokenizer, attn_pool, train_split, val_split, test_spl
         v_preds, v_targets = [], []
         with torch.no_grad():
             for ex in val_split:
-                probs = clf([ex["text"]])
-                p     = probs.cpu().numpy()[0]
+                logits = clf([ex["text"]])
+                p      = torch.sigmoid(logits).cpu().numpy()[0]
                 v_preds.append((p >= 0.5).astype(int))
                 t = np.zeros(10, dtype=int)
                 for lbl in ex["labels"]:
@@ -95,8 +110,8 @@ def run_few_shot(encoder, tokenizer, attn_pool, train_split, val_split, test_spl
     preds, targets = [], []
     with torch.no_grad():
         for ex in test_split:
-            probs = clf([ex["text"]])
-            p     = probs.cpu().numpy()[0]
+            logits = clf([ex["text"]])
+            p      = torch.sigmoid(logits).cpu().numpy()[0]
             preds.append((p >= 0.5).astype(int))
             t = np.zeros(10, dtype=int)
             for lbl in ex["labels"]:
