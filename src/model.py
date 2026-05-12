@@ -36,12 +36,14 @@ class GlocalIBModel(nn.Module):
         self.tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
         # Single shared encoder. Teacher pass uses stop-grad; student pass trains it.
         self.encoder   = RobertaModel.from_pretrained("distilroberta-base")
-        # use_reentrant=False is required: the encoder is called twice per forward
-        # (teacher under no_grad, student with grad), and the legacy reentrant
-        # autograd hook misaligns saved-vs-recomputed tensors under fp16+GradScaler.
-        self.encoder.gradient_checkpointing_enable(
-            gradient_checkpointing_kwargs={"use_reentrant": False}
-        )
+        # Gradient checkpointing intentionally OFF: the encoder is called twice
+        # per forward (teacher under no_grad, then student with grad) on the SAME
+        # module. Under fp16, both use_reentrant=True and use_reentrant=False paths
+        # corrupt the checkpoint frame's saved-tensor list across the two calls,
+        # producing `CheckpointError: Recomputed values have different metadata`
+        # at the first backward. With distilroberta-base (~82M params) and
+        # BATCH_SIZE=1, activations fit comfortably in 12GB; checkpointing isn't
+        # needed. Only re-enable if you raise BATCH_SIZE and hit OOM.
         self.encoder.config.use_cache = False
 
         # Separate attention pools: student trains via gradient, teacher updated via EMA.
