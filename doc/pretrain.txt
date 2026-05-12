@@ -1,259 +1,901 @@
 nohup: ignoring input
 The following values were not passed to `accelerate launch` and had defaults used instead:
-	`--num_processes` was set to a value of `10`
 		More than one GPU was found, enabling multi-GPU training.
 		If this was unintended please pass in `--num_processes=1`.
 	`--num_machines` was set to a value of `1`
 	`--mixed_precision` was set to a value of `'no'`
 	`--dynamo_backend` was set to a value of `'no'`
 To avoid this warning pass in values for each of the problematic parameters or run `accelerate config`.
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[launch] world_size=8 mixed_precision=fp16 device=cuda:0
 wandb: Currently logged in as: rfeliu (rfeliu-iwr) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
 wandb: Tracking run with wandb version 0.19.11
-wandb: Run data is saved locally in /export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/wandb/run-20260512_114435-97dbh7n1
+wandb: Run data is saved locally in /export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/wandb/run-20260512_121622-pnfw14u7
 wandb: Run `wandb offline` to turn off syncing.
 wandb: Syncing run glocal_ib
 wandb: ⭐️ View project at https://wandb.ai/rfeliu-iwr/glocal-nlp
-wandb: 🚀 View run at https://wandb.ai/rfeliu-iwr/glocal-nlp/runs/97dbh7n1
+wandb: 🚀 View run at https://wandb.ai/rfeliu-iwr/glocal-nlp/runs/pnfw14u7
 Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
 Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 5930.42it/s]
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 4594.32it/s]
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 5848.69it/s]
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 5772.88it/s]
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 6166.77it/s]
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 5502.72it/s]
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 6334.69it/s]
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 4889.79it/s]
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 7547.80it/s]
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 5990.20it/s]
-[rank0]:[E512 11:54:40.692119224 ProcessGroupNCCL.cpp:629] [Rank 0] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600000 milliseconds before timing out.
-[rank0]:[E512 11:54:40.694141801 ProcessGroupNCCL.cpp:2168] [PG ID 0 PG GUID 0(default_pg) Rank 0]  failure detected by watchdog at work sequence id: 3 PG status: last enqueued work: 5, last completed work: 2
-[rank0]:[E512 11:54:40.694190587 ProcessGroupNCCL.cpp:667] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
-[rank1]:[E512 11:54:40.706201903 ProcessGroupNCCL.cpp:629] [Rank 1] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600015 milliseconds before timing out.
-[rank1]:[E512 11:54:40.709926246 ProcessGroupNCCL.cpp:2168] [PG ID 0 PG GUID 0(default_pg) Rank 1]  failure detected by watchdog at work sequence id: 3 PG status: last enqueued work: 5, last completed work: 2
-[rank1]:[E512 11:54:40.709986806 ProcessGroupNCCL.cpp:667] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
-[rank2]:[E512 11:54:40.766635389 ProcessGroupNCCL.cpp:629] [Rank 2] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600074 milliseconds before timing out.
-[rank2]:[E512 11:54:40.767639905 ProcessGroupNCCL.cpp:2168] [PG ID 0 PG GUID 0(default_pg) Rank 2]  failure detected by watchdog at work sequence id: 3 PG status: last enqueued work: 5, last completed work: 2
-[rank2]:[E512 11:54:40.767663873 ProcessGroupNCCL.cpp:667] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
-[rank3]:[E512 11:54:40.862574048 ProcessGroupNCCL.cpp:629] [Rank 3] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600008 milliseconds before timing out.
-[rank9]:[E512 11:54:40.863402858 ProcessGroupNCCL.cpp:629] [Rank 9] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600005 milliseconds before timing out.
-[rank3]:[E512 11:54:40.864736048 ProcessGroupNCCL.cpp:2168] [PG ID 0 PG GUID 0(default_pg) Rank 3]  failure detected by watchdog at work sequence id: 3 PG status: last enqueued work: 5, last completed work: 2
-[rank3]:[E512 11:54:40.864768775 ProcessGroupNCCL.cpp:667] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
-[rank9]:[E512 11:54:40.864767963 ProcessGroupNCCL.cpp:2168] [PG ID 0 PG GUID 0(default_pg) Rank 9]  failure detected by watchdog at work sequence id: 3 PG status: last enqueued work: 5, last completed work: 2
-[rank9]:[E512 11:54:40.864791446 ProcessGroupNCCL.cpp:667] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
-[rank7]:[E512 11:54:40.867041815 ProcessGroupNCCL.cpp:629] [Rank 7] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600010 milliseconds before timing out.
-[rank7]:[E512 11:54:40.868527467 ProcessGroupNCCL.cpp:2168] [PG ID 0 PG GUID 0(default_pg) Rank 7]  failure detected by watchdog at work sequence id: 3 PG status: last enqueued work: 5, last completed work: 2
-[rank7]:[E512 11:54:40.868563594 ProcessGroupNCCL.cpp:667] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
-[rank5]:[E512 11:54:40.877188208 ProcessGroupNCCL.cpp:629] [Rank 5] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600029 milliseconds before timing out.
-[rank5]:[E512 11:54:40.878758978 ProcessGroupNCCL.cpp:2168] [PG ID 0 PG GUID 0(default_pg) Rank 5]  failure detected by watchdog at work sequence id: 3 PG status: last enqueued work: 5, last completed work: 2
-[rank5]:[E512 11:54:40.878798705 ProcessGroupNCCL.cpp:667] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
-[rank6]:[E512 11:54:40.913915757 ProcessGroupNCCL.cpp:629] [Rank 6] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600057 milliseconds before timing out.
-[rank6]:[E512 11:54:40.915865673 ProcessGroupNCCL.cpp:2168] [PG ID 0 PG GUID 0(default_pg) Rank 6]  failure detected by watchdog at work sequence id: 3 PG status: last enqueued work: 5, last completed work: 2
-[rank6]:[E512 11:54:40.915893420 ProcessGroupNCCL.cpp:667] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
-[rank8]:[E512 11:54:40.946953500 ProcessGroupNCCL.cpp:629] [Rank 8] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600096 milliseconds before timing out.
-[rank8]:[E512 11:54:40.947906399 ProcessGroupNCCL.cpp:2168] [PG ID 0 PG GUID 0(default_pg) Rank 8]  failure detected by watchdog at work sequence id: 3 PG status: last enqueued work: 5, last completed work: 2
-[rank8]:[E512 11:54:40.947926678 ProcessGroupNCCL.cpp:667] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
-[rank4]:[E512 11:54:40.952562798 ProcessGroupNCCL.cpp:629] [Rank 4] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600096 milliseconds before timing out.
-[rank4]:[E512 11:54:40.954427901 ProcessGroupNCCL.cpp:2168] [PG ID 0 PG GUID 0(default_pg) Rank 4]  failure detected by watchdog at work sequence id: 3 PG status: last enqueued work: 5, last completed work: 2
-[rank4]:[E512 11:54:40.954457951 ProcessGroupNCCL.cpp:667] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
-[rank0]:[E512 11:54:41.158474660 ProcessGroupNCCL.cpp:681] [Rank 0] Some NCCL operations have failed or timed out. Due to the asynchronous nature of CUDA kernels, subsequent GPU operations might run on corrupted/incomplete data.
-[rank0]:[E512 11:54:41.158493889 ProcessGroupNCCL.cpp:695] [Rank 0] To avoid data inconsistency, we are taking the entire process down.
-[rank0]:[E512 11:54:41.160027204 ProcessGroupNCCL.cpp:1895] [PG ID 0 PG GUID 0(default_pg) Rank 0] Process group watchdog thread terminated with exception: [Rank 0] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600000 milliseconds before timing out.
-Exception raised from checkTimeout at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:632 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x7f820896c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10d::ProcessGroupNCCL::WorkNCCL::checkTimeout(std::optional<std::chrono::duration<long, std::ratio<1l, 1000l> > >) + 0x2b4 (0x7f81b22a8e14 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: c10d::ProcessGroupNCCL::watchdogHandler() + 0x890 (0x7f81b22aa970 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #3: c10d::ProcessGroupNCCL::ncclCommWatchdog() + 0x14d (0x7f81b22ab88d in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #4: <unknown function> + 0x145c0 (0x7f82090e85c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #5: <unknown function> + 0x9caa4 (0x7f8209e9caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #6: <unknown function> + 0x129c6c (0x7f8209f29c6c in /lib/x86_64-linux-gnu/libc.so.6)
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 5175.24it/s]
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 5658.03it/s]
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 4439.10it/s]
+Loading weights: 100%|██████████| 103/103 [00:00<00:00, 4736.83it/s]
+Loading weights: 100%|██████████| 103/103 [00:00<00:00, 6267.42it/s]
+Loading weights: 100%|██████████| 103/103 [00:00<00:00, 5842.99it/s]
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 7460.08it/s]
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 6255.89it/s]
+[rank5]: Traceback (most recent call last):
+[rank5]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 176, in <module>
+[rank5]:     train()
+[rank5]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 122, in train
+[rank5]:     accelerator.backward(total)
+[rank5]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/accelerate/accelerator.py", line 2834, in backward
+[rank5]:     self.scaler.scale(loss).backward(**kwargs)
+[rank5]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/_tensor.py", line 626, in backward
+[rank5]:     torch.autograd.backward(
+[rank5]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/__init__.py", line 347, in backward
+[rank5]:     _engine_run_backward(
+[rank5]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/graph.py", line 823, in _engine_run_backward
+[rank5]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank5]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank5]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 1129, in unpack_hook
+[rank5]:     frame.check_recomputed_tensors_match(gid)
+[rank5]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 903, in check_recomputed_tensors_match
+[rank5]:     raise CheckpointError(
+[rank5]: torch.utils.checkpoint.CheckpointError: torch.utils.checkpoint: Recomputed values for the following tensors have different metadata than during the forward pass.
+[rank5]: tensor at position 0:
+[rank5]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([2198, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 2:
+[rank5]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([2198, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 3:
+[rank5]: saved metadata: {'shape': torch.Size([14, 12, 157, 157]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 4:
+[rank5]: saved metadata: {'shape': torch.Size([14, 12, 157, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([2198, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 5:
+[rank5]: saved metadata: {'shape': torch.Size([14, 12, 157, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 6:
+[rank5]: saved metadata: {'shape': torch.Size([14, 12, 157, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([14, 12, 157, 157]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 7:
+[rank5]: saved metadata: {'shape': torch.Size([14, 12, 160]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([14, 12, 157, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 9:
+[rank5]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank5]: recomputed metadata: {'shape': torch.Size([14, 12, 157, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 10:
+[rank5]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank5]: recomputed metadata: {'shape': torch.Size([14, 12, 160]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 11:
+[rank5]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([14, 12, 157, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 12:
+[rank5]: saved metadata: {'shape': torch.Size([14, 157, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank5]: tensor at position 13:
+[rank5]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank5]: tensor at position 14:
+[rank5]: saved metadata: {'shape': torch.Size([14, 157, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([2198, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 15:
+[rank5]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 16:
+[rank5]: saved metadata: {'shape': torch.Size([14, 157, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([14, 157, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 17:
+[rank5]: saved metadata: {'shape': torch.Size([14, 157, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 18:
+[rank5]: saved metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([14, 157, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 19:
+[rank5]: saved metadata: {'shape': torch.Size([14, 157, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 20:
+[rank5]: saved metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([14, 157, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 21:
+[rank5]: saved metadata: {'shape': torch.Size([14, 157, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([14, 157, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 22:
+[rank5]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([2198, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 23:
+[rank5]: saved metadata: {'shape': torch.Size([14, 157, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 24:
+[rank5]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([14, 157, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 25:
+[rank5]: saved metadata: {'shape': torch.Size([14, 157, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([2198, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
+[rank5]: tensor at position 26:
+[rank5]: saved metadata: {'shape': torch.Size([14, 157, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=5)}
+[rank5]: recomputed metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=5)}
 
-terminate called after throwing an instance of 'c10::DistBackendError'
-  what():  [PG ID 0 PG GUID 0(default_pg) Rank 0] Process group watchdog thread terminated with exception: [Rank 0] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600000 milliseconds before timing out.
-Exception raised from checkTimeout at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:632 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x7f820896c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10d::ProcessGroupNCCL::WorkNCCL::checkTimeout(std::optional<std::chrono::duration<long, std::ratio<1l, 1000l> > >) + 0x2b4 (0x7f81b22a8e14 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: c10d::ProcessGroupNCCL::watchdogHandler() + 0x890 (0x7f81b22aa970 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #3: c10d::ProcessGroupNCCL::ncclCommWatchdog() + 0x14d (0x7f81b22ab88d in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #4: <unknown function> + 0x145c0 (0x7f82090e85c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #5: <unknown function> + 0x9caa4 (0x7f8209e9caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #6: <unknown function> + 0x129c6c (0x7f8209f29c6c in /lib/x86_64-linux-gnu/libc.so.6)
+[rank6]: Traceback (most recent call last):
+[rank6]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 176, in <module>
+[rank6]:     train()
+[rank6]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 122, in train
+[rank6]:     accelerator.backward(total)
+[rank6]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/accelerate/accelerator.py", line 2834, in backward
+[rank6]:     self.scaler.scale(loss).backward(**kwargs)
+[rank6]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/_tensor.py", line 626, in backward
+[rank6]:     torch.autograd.backward(
+[rank6]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/__init__.py", line 347, in backward
+[rank6]:     _engine_run_backward(
+[rank6]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/graph.py", line 823, in _engine_run_backward
+[rank6]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank6]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank6]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 1129, in unpack_hook
+[rank6]:     frame.check_recomputed_tensors_match(gid)
+[rank6]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 903, in check_recomputed_tensors_match
+[rank6]:     raise CheckpointError(
+[rank6]: torch.utils.checkpoint.CheckpointError: torch.utils.checkpoint: Recomputed values for the following tensors have different metadata than during the forward pass.
+[rank6]: tensor at position 0:
+[rank6]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([2215, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 2:
+[rank6]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([2215, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 3:
+[rank6]: saved metadata: {'shape': torch.Size([5, 12, 443, 443]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 4:
+[rank6]: saved metadata: {'shape': torch.Size([5, 12, 443, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([2215, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 5:
+[rank6]: saved metadata: {'shape': torch.Size([5, 12, 443, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 6:
+[rank6]: saved metadata: {'shape': torch.Size([5, 12, 443, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([5, 12, 443, 443]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 7:
+[rank6]: saved metadata: {'shape': torch.Size([5, 12, 448]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([5, 12, 443, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 9:
+[rank6]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank6]: recomputed metadata: {'shape': torch.Size([5, 12, 443, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 10:
+[rank6]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank6]: recomputed metadata: {'shape': torch.Size([5, 12, 448]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 11:
+[rank6]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([5, 12, 443, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 12:
+[rank6]: saved metadata: {'shape': torch.Size([5, 443, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank6]: tensor at position 13:
+[rank6]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank6]: tensor at position 14:
+[rank6]: saved metadata: {'shape': torch.Size([5, 443, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([2215, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 15:
+[rank6]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 16:
+[rank6]: saved metadata: {'shape': torch.Size([5, 443, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([5, 443, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 17:
+[rank6]: saved metadata: {'shape': torch.Size([5, 443, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 18:
+[rank6]: saved metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([5, 443, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 19:
+[rank6]: saved metadata: {'shape': torch.Size([5, 443, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 20:
+[rank6]: saved metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([5, 443, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 21:
+[rank6]: saved metadata: {'shape': torch.Size([5, 443, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([5, 443, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 22:
+[rank6]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([2215, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 23:
+[rank6]: saved metadata: {'shape': torch.Size([5, 443, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 24:
+[rank6]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([5, 443, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 25:
+[rank6]: saved metadata: {'shape': torch.Size([5, 443, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([2215, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
+[rank6]: tensor at position 26:
+[rank6]: saved metadata: {'shape': torch.Size([5, 443, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=6)}
+[rank6]: recomputed metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=6)}
 
-Exception raised from ncclCommWatchdog at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:1901 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x7f820896c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: <unknown function> + 0xe5829e (0x7f81b1f1229e in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: <unknown function> + 0x145c0 (0x7f82090e85c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #3: <unknown function> + 0x9caa4 (0x7f8209e9caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #4: <unknown function> + 0x129c6c (0x7f8209f29c6c in /lib/x86_64-linux-gnu/libc.so.6)
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 176, in <module>
+[rank1]:     train()
+[rank1]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 122, in train
+[rank1]:     accelerator.backward(total)
+[rank1]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/accelerate/accelerator.py", line 2834, in backward
+[rank1]:     self.scaler.scale(loss).backward(**kwargs)
+[rank1]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/_tensor.py", line 626, in backward
+[rank1]:     torch.autograd.backward(
+[rank1]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/__init__.py", line 347, in backward
+[rank1]:     _engine_run_backward(
+[rank1]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/graph.py", line 823, in _engine_run_backward
+[rank1]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 1129, in unpack_hook
+[rank1]:     frame.check_recomputed_tensors_match(gid)
+[rank1]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 903, in check_recomputed_tensors_match
+[rank1]:     raise CheckpointError(
+[rank1]: torch.utils.checkpoint.CheckpointError: torch.utils.checkpoint: Recomputed values for the following tensors have different metadata than during the forward pass.
+[rank1]: tensor at position 0:
+[rank1]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([3341, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 2:
+[rank1]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([3341, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 3:
+[rank1]: saved metadata: {'shape': torch.Size([13, 12, 257, 257]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 4:
+[rank1]: saved metadata: {'shape': torch.Size([13, 12, 257, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([3341, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 5:
+[rank1]: saved metadata: {'shape': torch.Size([13, 12, 257, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 6:
+[rank1]: saved metadata: {'shape': torch.Size([13, 12, 257, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([13, 12, 257, 257]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 7:
+[rank1]: saved metadata: {'shape': torch.Size([13, 12, 288]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([13, 12, 257, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 9:
+[rank1]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank1]: recomputed metadata: {'shape': torch.Size([13, 12, 257, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 10:
+[rank1]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank1]: recomputed metadata: {'shape': torch.Size([13, 12, 288]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 11:
+[rank1]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([13, 12, 257, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 12:
+[rank1]: saved metadata: {'shape': torch.Size([13, 257, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank1]: tensor at position 13:
+[rank1]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank1]: tensor at position 14:
+[rank1]: saved metadata: {'shape': torch.Size([13, 257, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([3341, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 15:
+[rank1]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 16:
+[rank1]: saved metadata: {'shape': torch.Size([13, 257, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([13, 257, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 17:
+[rank1]: saved metadata: {'shape': torch.Size([13, 257, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 18:
+[rank1]: saved metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([13, 257, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 19:
+[rank1]: saved metadata: {'shape': torch.Size([13, 257, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 20:
+[rank1]: saved metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([13, 257, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 21:
+[rank1]: saved metadata: {'shape': torch.Size([13, 257, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([13, 257, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 22:
+[rank1]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([3341, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 23:
+[rank1]: saved metadata: {'shape': torch.Size([13, 257, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 24:
+[rank1]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([13, 257, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 25:
+[rank1]: saved metadata: {'shape': torch.Size([13, 257, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([3341, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
+[rank1]: tensor at position 26:
+[rank1]: saved metadata: {'shape': torch.Size([13, 257, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=1)}
+[rank1]: recomputed metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=1)}
 
-[rank1]:[E512 11:54:41.168820498 ProcessGroupNCCL.cpp:681] [Rank 1] Some NCCL operations have failed or timed out. Due to the asynchronous nature of CUDA kernels, subsequent GPU operations might run on corrupted/incomplete data.
-[rank1]:[E512 11:54:41.168839734 ProcessGroupNCCL.cpp:695] [Rank 1] To avoid data inconsistency, we are taking the entire process down.
-[rank1]:[E512 11:54:41.170565432 ProcessGroupNCCL.cpp:1895] [PG ID 0 PG GUID 0(default_pg) Rank 1] Process group watchdog thread terminated with exception: [Rank 1] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600015 milliseconds before timing out.
-Exception raised from checkTimeout at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:632 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x7322a4d6c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10d::ProcessGroupNCCL::WorkNCCL::checkTimeout(std::optional<std::chrono::duration<long, std::ratio<1l, 1000l> > >) + 0x2b4 (0x73224e2a8e14 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: c10d::ProcessGroupNCCL::watchdogHandler() + 0x890 (0x73224e2aa970 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #3: c10d::ProcessGroupNCCL::ncclCommWatchdog() + 0x14d (0x73224e2ab88d in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #4: <unknown function> + 0x145c0 (0x7322a5f4e5c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #5: <unknown function> + 0x9caa4 (0x7322a609caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #6: <unknown function> + 0x129c6c (0x7322a6129c6c in /lib/x86_64-linux-gnu/libc.so.6)
+[rank2]: Traceback (most recent call last):
+[rank2]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 176, in <module>
+[rank2]:     train()
+[rank2]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 122, in train
+[rank2]:     accelerator.backward(total)
+[rank2]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/accelerate/accelerator.py", line 2834, in backward
+[rank2]:     self.scaler.scale(loss).backward(**kwargs)
+[rank2]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/_tensor.py", line 626, in backward
+[rank2]:     torch.autograd.backward(
+[rank2]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/__init__.py", line 347, in backward
+[rank2]:     _engine_run_backward(
+[rank2]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/graph.py", line 823, in _engine_run_backward
+[rank2]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 1129, in unpack_hook
+[rank2]:     frame.check_recomputed_tensors_match(gid)
+[rank2]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 903, in check_recomputed_tensors_match
+[rank2]:     raise CheckpointError(
+[rank2]: torch.utils.checkpoint.CheckpointError: torch.utils.checkpoint: Recomputed values for the following tensors have different metadata than during the forward pass.
+[rank2]: tensor at position 0:
+[rank2]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([3768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 2:
+[rank2]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([3768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 3:
+[rank2]: saved metadata: {'shape': torch.Size([12, 12, 314, 314]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 4:
+[rank2]: saved metadata: {'shape': torch.Size([12, 12, 314, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([3768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 5:
+[rank2]: saved metadata: {'shape': torch.Size([12, 12, 314, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 6:
+[rank2]: saved metadata: {'shape': torch.Size([12, 12, 314, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([12, 12, 314, 314]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 7:
+[rank2]: saved metadata: {'shape': torch.Size([12, 12, 320]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([12, 12, 314, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 9:
+[rank2]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank2]: recomputed metadata: {'shape': torch.Size([12, 12, 314, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 10:
+[rank2]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank2]: recomputed metadata: {'shape': torch.Size([12, 12, 320]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 11:
+[rank2]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([12, 12, 314, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 12:
+[rank2]: saved metadata: {'shape': torch.Size([12, 314, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank2]: tensor at position 13:
+[rank2]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank2]: tensor at position 14:
+[rank2]: saved metadata: {'shape': torch.Size([12, 314, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([3768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 15:
+[rank2]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 16:
+[rank2]: saved metadata: {'shape': torch.Size([12, 314, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([12, 314, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 17:
+[rank2]: saved metadata: {'shape': torch.Size([12, 314, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 18:
+[rank2]: saved metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([12, 314, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 19:
+[rank2]: saved metadata: {'shape': torch.Size([12, 314, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 20:
+[rank2]: saved metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([12, 314, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 21:
+[rank2]: saved metadata: {'shape': torch.Size([12, 314, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([12, 314, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 22:
+[rank2]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([3768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 23:
+[rank2]: saved metadata: {'shape': torch.Size([12, 314, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 24:
+[rank2]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([12, 314, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 25:
+[rank2]: saved metadata: {'shape': torch.Size([12, 314, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([3768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
+[rank2]: tensor at position 26:
+[rank2]: saved metadata: {'shape': torch.Size([12, 314, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=2)}
+[rank2]: recomputed metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=2)}
 
-terminate called after throwing an instance of 'c10::DistBackendError'
-  what():  [PG ID 0 PG GUID 0(default_pg) Rank 1] Process group watchdog thread terminated with exception: [Rank 1] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600015 milliseconds before timing out.
-Exception raised from checkTimeout at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:632 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x7322a4d6c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10d::ProcessGroupNCCL::WorkNCCL::checkTimeout(std::optional<std::chrono::duration<long, std::ratio<1l, 1000l> > >) + 0x2b4 (0x73224e2a8e14 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: c10d::ProcessGroupNCCL::watchdogHandler() + 0x890 (0x73224e2aa970 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #3: c10d::ProcessGroupNCCL::ncclCommWatchdog() + 0x14d (0x73224e2ab88d in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #4: <unknown function> + 0x145c0 (0x7322a5f4e5c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #5: <unknown function> + 0x9caa4 (0x7322a609caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #6: <unknown function> + 0x129c6c (0x7322a6129c6c in /lib/x86_64-linux-gnu/libc.so.6)
+Traceback (most recent call last):
+  File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 176, in <module>
+    train()
+  File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 122, in train
+    accelerator.backward(total)
+  File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/accelerate/accelerator.py", line 2834, in backward
+    self.scaler.scale(loss).backward(**kwargs)
+  File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/_tensor.py", line 626, in backward
+    torch.autograd.backward(
+  File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/__init__.py", line 347, in backward
+    _engine_run_backward(
+  File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/graph.py", line 823, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 1129, in unpack_hook
+    frame.check_recomputed_tensors_match(gid)
+  File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 903, in check_recomputed_tensors_match
+    raise CheckpointError(
+torch.utils.checkpoint.CheckpointError: torch.utils.checkpoint: Recomputed values for the following tensors have different metadata than during the forward pass.
+tensor at position 0:
+saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([5632, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 2:
+saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([5632, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 3:
+saved metadata: {'shape': torch.Size([11, 12, 512, 512]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 4:
+saved metadata: {'shape': torch.Size([11, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([5632, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 5:
+saved metadata: {'shape': torch.Size([11, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 6:
+saved metadata: {'shape': torch.Size([11, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([11, 12, 512, 512]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 7:
+saved metadata: {'shape': torch.Size([11, 12, 512]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([11, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 9:
+saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+recomputed metadata: {'shape': torch.Size([11, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 10:
+saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+recomputed metadata: {'shape': torch.Size([11, 12, 512]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+tensor at position 11:
+saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([11, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 12:
+saved metadata: {'shape': torch.Size([11, 512, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+tensor at position 13:
+saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+tensor at position 14:
+saved metadata: {'shape': torch.Size([11, 512, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([5632, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 15:
+saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 16:
+saved metadata: {'shape': torch.Size([11, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([11, 512, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=0)}
+tensor at position 17:
+saved metadata: {'shape': torch.Size([11, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+tensor at position 18:
+saved metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([11, 512, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+tensor at position 19:
+saved metadata: {'shape': torch.Size([11, 512, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+tensor at position 20:
+saved metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([11, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+tensor at position 21:
+saved metadata: {'shape': torch.Size([11, 512, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([11, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+tensor at position 22:
+saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([5632, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 23:
+saved metadata: {'shape': torch.Size([11, 512, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 24:
+saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([11, 512, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 25:
+saved metadata: {'shape': torch.Size([11, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([5632, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+tensor at position 26:
+saved metadata: {'shape': torch.Size([11, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+recomputed metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
 
-Exception raised from ncclCommWatchdog at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:1901 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x7322a4d6c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: <unknown function> + 0xe5829e (0x73224df1229e in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: <unknown function> + 0x145c0 (0x7322a5f4e5c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #3: <unknown function> + 0x9caa4 (0x7322a609caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #4: <unknown function> + 0x129c6c (0x7322a6129c6c in /lib/x86_64-linux-gnu/libc.so.6)
+[rank4]: Traceback (most recent call last):
+[rank4]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 176, in <module>
+[rank4]:     train()
+[rank4]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 122, in train
+[rank4]:     accelerator.backward(total)
+[rank4]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/accelerate/accelerator.py", line 2834, in backward
+[rank4]:     self.scaler.scale(loss).backward(**kwargs)
+[rank4]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/_tensor.py", line 626, in backward
+[rank4]:     torch.autograd.backward(
+[rank4]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/__init__.py", line 347, in backward
+[rank4]:     _engine_run_backward(
+[rank4]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/graph.py", line 823, in _engine_run_backward
+[rank4]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank4]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank4]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 1129, in unpack_hook
+[rank4]:     frame.check_recomputed_tensors_match(gid)
+[rank4]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 903, in check_recomputed_tensors_match
+[rank4]:     raise CheckpointError(
+[rank4]: torch.utils.checkpoint.CheckpointError: torch.utils.checkpoint: Recomputed values for the following tensors have different metadata than during the forward pass.
+[rank4]: tensor at position 0:
+[rank4]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([4532, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 2:
+[rank4]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([4532, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 3:
+[rank4]: saved metadata: {'shape': torch.Size([11, 12, 412, 412]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 4:
+[rank4]: saved metadata: {'shape': torch.Size([11, 12, 412, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([4532, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 5:
+[rank4]: saved metadata: {'shape': torch.Size([11, 12, 412, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 6:
+[rank4]: saved metadata: {'shape': torch.Size([11, 12, 412, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([11, 12, 412, 412]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 7:
+[rank4]: saved metadata: {'shape': torch.Size([11, 12, 416]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([11, 12, 412, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 9:
+[rank4]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank4]: recomputed metadata: {'shape': torch.Size([11, 12, 412, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 10:
+[rank4]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank4]: recomputed metadata: {'shape': torch.Size([11, 12, 416]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 11:
+[rank4]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([11, 12, 412, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 12:
+[rank4]: saved metadata: {'shape': torch.Size([11, 412, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank4]: tensor at position 13:
+[rank4]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank4]: tensor at position 14:
+[rank4]: saved metadata: {'shape': torch.Size([11, 412, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([4532, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 15:
+[rank4]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 16:
+[rank4]: saved metadata: {'shape': torch.Size([11, 412, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([11, 412, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 17:
+[rank4]: saved metadata: {'shape': torch.Size([11, 412, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 18:
+[rank4]: saved metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([11, 412, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 19:
+[rank4]: saved metadata: {'shape': torch.Size([11, 412, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 20:
+[rank4]: saved metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([11, 412, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 21:
+[rank4]: saved metadata: {'shape': torch.Size([11, 412, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([11, 412, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 22:
+[rank4]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([4532, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 23:
+[rank4]: saved metadata: {'shape': torch.Size([11, 412, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 24:
+[rank4]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([11, 412, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 25:
+[rank4]: saved metadata: {'shape': torch.Size([11, 412, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([4532, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
+[rank4]: tensor at position 26:
+[rank4]: saved metadata: {'shape': torch.Size([11, 412, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=4)}
+[rank4]: recomputed metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=4)}
 
-[rank2]:[E512 11:54:41.173907981 ProcessGroupNCCL.cpp:681] [Rank 2] Some NCCL operations have failed or timed out. Due to the asynchronous nature of CUDA kernels, subsequent GPU operations might run on corrupted/incomplete data.
-[rank2]:[E512 11:54:41.173920670 ProcessGroupNCCL.cpp:695] [Rank 2] To avoid data inconsistency, we are taking the entire process down.
-[rank2]:[E512 11:54:41.175354779 ProcessGroupNCCL.cpp:1895] [PG ID 0 PG GUID 0(default_pg) Rank 2] Process group watchdog thread terminated with exception: [Rank 2] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600074 milliseconds before timing out.
-Exception raised from checkTimeout at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:632 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x784f54f6c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10d::ProcessGroupNCCL::WorkNCCL::checkTimeout(std::optional<std::chrono::duration<long, std::ratio<1l, 1000l> > >) + 0x2b4 (0x784efe4a8e14 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: c10d::ProcessGroupNCCL::watchdogHandler() + 0x890 (0x784efe4aa970 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #3: c10d::ProcessGroupNCCL::ncclCommWatchdog() + 0x14d (0x784efe4ab88d in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #4: <unknown function> + 0x145c0 (0x784f553e95c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #5: <unknown function> + 0x9caa4 (0x784f5629caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #6: <unknown function> + 0x129c6c (0x784f56329c6c in /lib/x86_64-linux-gnu/libc.so.6)
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 176, in <module>
+[rank0]:     train()
+[rank0]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 122, in train
+[rank0]:     accelerator.backward(total)
+[rank0]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/accelerate/accelerator.py", line 2834, in backward
+[rank0]:     self.scaler.scale(loss).backward(**kwargs)
+[rank0]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/_tensor.py", line 626, in backward
+[rank0]:     torch.autograd.backward(
+[rank0]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/__init__.py", line 347, in backward
+[rank0]:     _engine_run_backward(
+[rank0]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/graph.py", line 823, in _engine_run_backward
+[rank0]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 1129, in unpack_hook
+[rank0]:     frame.check_recomputed_tensors_match(gid)
+[rank0]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 903, in check_recomputed_tensors_match
+[rank0]:     raise CheckpointError(
+[rank0]: torch.utils.checkpoint.CheckpointError: torch.utils.checkpoint: Recomputed values for the following tensors have different metadata than during the forward pass.
+[rank0]: tensor at position 0:
+[rank0]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([5632, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 2:
+[rank0]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([5632, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 3:
+[rank0]: saved metadata: {'shape': torch.Size([11, 12, 512, 512]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 4:
+[rank0]: saved metadata: {'shape': torch.Size([11, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([5632, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 5:
+[rank0]: saved metadata: {'shape': torch.Size([11, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 6:
+[rank0]: saved metadata: {'shape': torch.Size([11, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([11, 12, 512, 512]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 7:
+[rank0]: saved metadata: {'shape': torch.Size([11, 12, 512]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([11, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 9:
+[rank0]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank0]: recomputed metadata: {'shape': torch.Size([11, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 10:
+[rank0]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank0]: recomputed metadata: {'shape': torch.Size([11, 12, 512]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 11:
+[rank0]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([11, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 12:
+[rank0]: saved metadata: {'shape': torch.Size([11, 512, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank0]: tensor at position 13:
+[rank0]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank0]: tensor at position 14:
+[rank0]: saved metadata: {'shape': torch.Size([11, 512, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([5632, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 15:
+[rank0]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 16:
+[rank0]: saved metadata: {'shape': torch.Size([11, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([11, 512, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 17:
+[rank0]: saved metadata: {'shape': torch.Size([11, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 18:
+[rank0]: saved metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([11, 512, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 19:
+[rank0]: saved metadata: {'shape': torch.Size([11, 512, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 20:
+[rank0]: saved metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([11, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 21:
+[rank0]: saved metadata: {'shape': torch.Size([11, 512, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([11, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 22:
+[rank0]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([5632, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 23:
+[rank0]: saved metadata: {'shape': torch.Size([11, 512, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 24:
+[rank0]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([11, 512, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 25:
+[rank0]: saved metadata: {'shape': torch.Size([11, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([5632, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
+[rank0]: tensor at position 26:
+[rank0]: saved metadata: {'shape': torch.Size([11, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=0)}
+[rank0]: recomputed metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=0)}
 
-terminate called after throwing an instance of 'c10::DistBackendError'
-  what():  [PG ID 0 PG GUID 0(default_pg) Rank 2] Process group watchdog thread terminated with exception: [Rank 2] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600074 milliseconds before timing out.
-Exception raised from checkTimeout at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:632 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x784f54f6c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10d::ProcessGroupNCCL::WorkNCCL::checkTimeout(std::optional<std::chrono::duration<long, std::ratio<1l, 1000l> > >) + 0x2b4 (0x784efe4a8e14 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: c10d::ProcessGroupNCCL::watchdogHandler() + 0x890 (0x784efe4aa970 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #3: c10d::ProcessGroupNCCL::ncclCommWatchdog() + 0x14d (0x784efe4ab88d in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #4: <unknown function> + 0x145c0 (0x784f553e95c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #5: <unknown function> + 0x9caa4 (0x784f5629caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #6: <unknown function> + 0x129c6c (0x784f56329c6c in /lib/x86_64-linux-gnu/libc.so.6)
+[rank7]: Traceback (most recent call last):
+[rank7]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 176, in <module>
+[rank7]:     train()
+[rank7]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 122, in train
+[rank7]:     accelerator.backward(total)
+[rank7]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/accelerate/accelerator.py", line 2834, in backward
+[rank7]:     self.scaler.scale(loss).backward(**kwargs)
+[rank7]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/_tensor.py", line 626, in backward
+[rank7]:     torch.autograd.backward(
+[rank7]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/__init__.py", line 347, in backward
+[rank7]:     _engine_run_backward(
+[rank7]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/graph.py", line 823, in _engine_run_backward
+[rank7]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank7]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank7]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 1129, in unpack_hook
+[rank7]:     frame.check_recomputed_tensors_match(gid)
+[rank7]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 903, in check_recomputed_tensors_match
+[rank7]:     raise CheckpointError(
+[rank7]: torch.utils.checkpoint.CheckpointError: torch.utils.checkpoint: Recomputed values for the following tensors have different metadata than during the forward pass.
+[rank7]: tensor at position 0:
+[rank7]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([8192, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 2:
+[rank7]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([8192, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 3:
+[rank7]: saved metadata: {'shape': torch.Size([16, 12, 512, 512]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 4:
+[rank7]: saved metadata: {'shape': torch.Size([16, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([8192, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 5:
+[rank7]: saved metadata: {'shape': torch.Size([16, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 6:
+[rank7]: saved metadata: {'shape': torch.Size([16, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([16, 12, 512, 512]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 7:
+[rank7]: saved metadata: {'shape': torch.Size([16, 12, 512]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([16, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 9:
+[rank7]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank7]: recomputed metadata: {'shape': torch.Size([16, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 10:
+[rank7]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank7]: recomputed metadata: {'shape': torch.Size([16, 12, 512]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 11:
+[rank7]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([16, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 12:
+[rank7]: saved metadata: {'shape': torch.Size([16, 512, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank7]: tensor at position 13:
+[rank7]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank7]: tensor at position 14:
+[rank7]: saved metadata: {'shape': torch.Size([16, 512, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([8192, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 15:
+[rank7]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 16:
+[rank7]: saved metadata: {'shape': torch.Size([16, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([16, 512, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 17:
+[rank7]: saved metadata: {'shape': torch.Size([16, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 18:
+[rank7]: saved metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([16, 512, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 19:
+[rank7]: saved metadata: {'shape': torch.Size([16, 512, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 20:
+[rank7]: saved metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([16, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 21:
+[rank7]: saved metadata: {'shape': torch.Size([16, 512, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([16, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 22:
+[rank7]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([8192, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 23:
+[rank7]: saved metadata: {'shape': torch.Size([16, 512, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 24:
+[rank7]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([16, 512, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 25:
+[rank7]: saved metadata: {'shape': torch.Size([16, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([8192, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
+[rank7]: tensor at position 26:
+[rank7]: saved metadata: {'shape': torch.Size([16, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=7)}
+[rank7]: recomputed metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=7)}
 
-Exception raised from ncclCommWatchdog at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:1901 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x784f54f6c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: <unknown function> + 0xe5829e (0x784efe11229e in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: <unknown function> + 0x145c0 (0x784f553e95c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #3: <unknown function> + 0x9caa4 (0x784f5629caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #4: <unknown function> + 0x129c6c (0x784f56329c6c in /lib/x86_64-linux-gnu/libc.so.6)
+[rank3]: Traceback (most recent call last):
+[rank3]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 176, in <module>
+[rank3]:     train()
+[rank3]:   File "/export/home/rfeliu/sbi_model_comparison/data/GlocalDoc/scripts/02_pretrain_glocal.py", line 122, in train
+[rank3]:     accelerator.backward(total)
+[rank3]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/accelerate/accelerator.py", line 2834, in backward
+[rank3]:     self.scaler.scale(loss).backward(**kwargs)
+[rank3]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/_tensor.py", line 626, in backward
+[rank3]:     torch.autograd.backward(
+[rank3]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/__init__.py", line 347, in backward
+[rank3]:     _engine_run_backward(
+[rank3]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/autograd/graph.py", line 823, in _engine_run_backward
+[rank3]:     return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 1129, in unpack_hook
+[rank3]:     frame.check_recomputed_tensors_match(gid)
+[rank3]:   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/utils/checkpoint.py", line 903, in check_recomputed_tensors_match
+[rank3]:     raise CheckpointError(
+[rank3]: torch.utils.checkpoint.CheckpointError: torch.utils.checkpoint: Recomputed values for the following tensors have different metadata than during the forward pass.
+[rank3]: tensor at position 0:
+[rank3]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([11776, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 2:
+[rank3]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([11776, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 3:
+[rank3]: saved metadata: {'shape': torch.Size([23, 12, 512, 512]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 4:
+[rank3]: saved metadata: {'shape': torch.Size([23, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([11776, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 5:
+[rank3]: saved metadata: {'shape': torch.Size([23, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 6:
+[rank3]: saved metadata: {'shape': torch.Size([23, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([23, 12, 512, 512]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 7:
+[rank3]: saved metadata: {'shape': torch.Size([23, 12, 512]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([23, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 9:
+[rank3]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank3]: recomputed metadata: {'shape': torch.Size([23, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 10:
+[rank3]: saved metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank3]: recomputed metadata: {'shape': torch.Size([23, 12, 512]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 11:
+[rank3]: saved metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([23, 12, 512, 64]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 12:
+[rank3]: saved metadata: {'shape': torch.Size([23, 512, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank3]: tensor at position 13:
+[rank3]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([]), 'dtype': torch.int64, 'device': device(type='cpu')}
+[rank3]: tensor at position 14:
+[rank3]: saved metadata: {'shape': torch.Size([23, 512, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([11776, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 15:
+[rank3]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([768, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 16:
+[rank3]: saved metadata: {'shape': torch.Size([23, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([23, 512, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 17:
+[rank3]: saved metadata: {'shape': torch.Size([23, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 18:
+[rank3]: saved metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([23, 512, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 19:
+[rank3]: saved metadata: {'shape': torch.Size([23, 512, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 20:
+[rank3]: saved metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([23, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 21:
+[rank3]: saved metadata: {'shape': torch.Size([23, 512, 768]), 'dtype': torch.bool, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([23, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 22:
+[rank3]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([11776, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 23:
+[rank3]: saved metadata: {'shape': torch.Size([23, 512, 768]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([768, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 24:
+[rank3]: saved metadata: {'shape': torch.Size([768]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([23, 512, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 25:
+[rank3]: saved metadata: {'shape': torch.Size([23, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([11776, 3072]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
+[rank3]: tensor at position 26:
+[rank3]: saved metadata: {'shape': torch.Size([23, 512, 1]), 'dtype': torch.float32, 'device': device(type='cuda', index=3)}
+[rank3]: recomputed metadata: {'shape': torch.Size([3072, 768]), 'dtype': torch.float16, 'device': device(type='cuda', index=3)}
 
-[rank9]:[E512 11:54:41.332614492 ProcessGroupNCCL.cpp:681] [Rank 9] Some NCCL operations have failed or timed out. Due to the asynchronous nature of CUDA kernels, subsequent GPU operations might run on corrupted/incomplete data.
-[rank9]:[E512 11:54:41.332631502 ProcessGroupNCCL.cpp:695] [Rank 9] To avoid data inconsistency, we are taking the entire process down.
-[rank9]:[E512 11:54:41.334119976 ProcessGroupNCCL.cpp:1895] [PG ID 0 PG GUID 0(default_pg) Rank 9] Process group watchdog thread terminated with exception: [Rank 9] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600005 milliseconds before timing out.
-Exception raised from checkTimeout at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:632 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x77d25a16c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10d::ProcessGroupNCCL::WorkNCCL::checkTimeout(std::optional<std::chrono::duration<long, std::ratio<1l, 1000l> > >) + 0x2b4 (0x77d203aa8e14 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: c10d::ProcessGroupNCCL::watchdogHandler() + 0x890 (0x77d203aaa970 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #3: c10d::ProcessGroupNCCL::ncclCommWatchdog() + 0x14d (0x77d203aab88d in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #4: <unknown function> + 0x145c0 (0x77d25b5bc5c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #5: <unknown function> + 0x9caa4 (0x77d25b69caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #6: <unknown function> + 0x129c6c (0x77d25b729c6c in /lib/x86_64-linux-gnu/libc.so.6)
-
-terminate called after throwing an instance of 'c10::DistBackendError'
-  what():  [PG ID 0 PG GUID 0(default_pg) Rank 9] Process group watchdog thread terminated with exception: [Rank 9] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600005 milliseconds before timing out.
-Exception raised from checkTimeout at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:632 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x77d25a16c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10d::ProcessGroupNCCL::WorkNCCL::checkTimeout(std::optional<std::chrono::duration<long, std::ratio<1l, 1000l> > >) + 0x2b4 (0x77d203aa8e14 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: c10d::ProcessGroupNCCL::watchdogHandler() + 0x890 (0x77d203aaa970 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #3: c10d::ProcessGroupNCCL::ncclCommWatchdog() + 0x14d (0x77d203aab88d in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #4: <unknown function> + 0x145c0 (0x77d25b5bc5c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #5: <unknown function> + 0x9caa4 (0x77d25b69caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #6: <unknown function> + 0x129c6c (0x77d25b729c6c in /lib/x86_64-linux-gnu/libc.so.6)
-
-Exception raised from ncclCommWatchdog at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:1901 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x77d25a16c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: <unknown function> + 0xe5829e (0x77d20371229e in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: <unknown function> + 0x145c0 (0x77d25b5bc5c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #3: <unknown function> + 0x9caa4 (0x77d25b69caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #4: <unknown function> + 0x129c6c (0x77d25b729c6c in /lib/x86_64-linux-gnu/libc.so.6)
-
-[rank8]:[E512 11:54:41.336562309 ProcessGroupNCCL.cpp:681] [Rank 8] Some NCCL operations have failed or timed out. Due to the asynchronous nature of CUDA kernels, subsequent GPU operations might run on corrupted/incomplete data.
-[rank8]:[E512 11:54:41.336574530 ProcessGroupNCCL.cpp:695] [Rank 8] To avoid data inconsistency, we are taking the entire process down.
-[rank7]:[E512 11:54:41.337206543 ProcessGroupNCCL.cpp:681] [Rank 7] Some NCCL operations have failed or timed out. Due to the asynchronous nature of CUDA kernels, subsequent GPU operations might run on corrupted/incomplete data.
-[rank7]:[E512 11:54:41.337216912 ProcessGroupNCCL.cpp:695] [Rank 7] To avoid data inconsistency, we are taking the entire process down.
-[rank8]:[E512 11:54:41.337991856 ProcessGroupNCCL.cpp:1895] [PG ID 0 PG GUID 0(default_pg) Rank 8] Process group watchdog thread terminated with exception: [Rank 8] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600096 milliseconds before timing out.
-Exception raised from checkTimeout at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:632 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x756147b6c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10d::ProcessGroupNCCL::WorkNCCL::checkTimeout(std::optional<std::chrono::duration<long, std::ratio<1l, 1000l> > >) + 0x2b4 (0x7560f14a8e14 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: c10d::ProcessGroupNCCL::watchdogHandler() + 0x890 (0x7560f14aa970 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #3: c10d::ProcessGroupNCCL::ncclCommWatchdog() + 0x14d (0x7560f14ab88d in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #4: <unknown function> + 0x145c0 (0x756148f5b5c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #5: <unknown function> + 0x9caa4 (0x75614909caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #6: <unknown function> + 0x129c6c (0x756149129c6c in /lib/x86_64-linux-gnu/libc.so.6)
-
-terminate called after throwing an instance of 'c10::DistBackendError'
-  what():  [PG ID 0 PG GUID 0(default_pg) Rank 8] Process group watchdog thread terminated with exception: [Rank 8] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600096 milliseconds before timing out.
-Exception raised from checkTimeout at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:632 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x756147b6c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10d::ProcessGroupNCCL::WorkNCCL::checkTimeout(std::optional<std::chrono::duration<long, std::ratio<1l, 1000l> > >) + 0x2b4 (0x7560f14a8e14 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: c10d::ProcessGroupNCCL::watchdogHandler() + 0x890 (0x7560f14aa970 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #3: c10d::ProcessGroupNCCL::ncclCommWatchdog() + 0x14d (0x7560f14ab88d in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #4: <unknown function> + 0x145c0 (0x756148f5b5c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #5: <unknown function> + 0x9caa4 (0x75614909caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #6: <unknown function> + 0x129c6c (0x756149129c6c in /lib/x86_64-linux-gnu/libc.so.6)
-
-Exception raised from ncclCommWatchdog at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:1901 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x756147b6c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: <unknown function> + 0xe5829e (0x7560f111229e in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: <unknown function> + 0x145c0 (0x756148f5b5c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #3: <unknown function> + 0x9caa4 (0x75614909caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #4: <unknown function> + 0x129c6c (0x756149129c6c in /lib/x86_64-linux-gnu/libc.so.6)
-
-[rank7]:[E512 11:54:41.338663636 ProcessGroupNCCL.cpp:1895] [PG ID 0 PG GUID 0(default_pg) Rank 7] Process group watchdog thread terminated with exception: [Rank 7] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600010 milliseconds before timing out.
-Exception raised from checkTimeout at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:632 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x78d0e736c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10d::ProcessGroupNCCL::WorkNCCL::checkTimeout(std::optional<std::chrono::duration<long, std::ratio<1l, 1000l> > >) + 0x2b4 (0x78d090ca8e14 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: c10d::ProcessGroupNCCL::watchdogHandler() + 0x890 (0x78d090caa970 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #3: c10d::ProcessGroupNCCL::ncclCommWatchdog() + 0x14d (0x78d090cab88d in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #4: <unknown function> + 0x145c0 (0x78d0e7acb5c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #5: <unknown function> + 0x9caa4 (0x78d0e889caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #6: <unknown function> + 0x129c6c (0x78d0e8929c6c in /lib/x86_64-linux-gnu/libc.so.6)
-
-terminate called after throwing an instance of 'c10::DistBackendError'
-  what():  [PG ID 0 PG GUID 0(default_pg) Rank 7] Process group watchdog thread terminated with exception: [Rank 7] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=3, OpType=BROADCAST, NumelIn=67349764, NumelOut=67349764, Timeout(ms)=600000) ran for 600010 milliseconds before timing out.
-Exception raised from checkTimeout at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:632 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x78d0e736c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: c10d::ProcessGroupNCCL::WorkNCCL::checkTimeout(std::optional<std::chrono::duration<long, std::ratio<1l, 1000l> > >) + 0x2b4 (0x78d090ca8e14 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: c10d::ProcessGroupNCCL::watchdogHandler() + 0x890 (0x78d090caa970 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #3: c10d::ProcessGroupNCCL::ncclCommWatchdog() + 0x14d (0x78d090cab88d in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #4: <unknown function> + 0x145c0 (0x78d0e7acb5c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #5: <unknown function> + 0x9caa4 (0x78d0e889caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #6: <unknown function> + 0x129c6c (0x78d0e8929c6c in /lib/x86_64-linux-gnu/libc.so.6)
-
-Exception raised from ncclCommWatchdog at /pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:1901 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x96 (0x78d0e736c1b6 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)
-frame #1: <unknown function> + 0xe5829e (0x78d09091229e in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cuda.so)
-frame #2: <unknown function> + 0x145c0 (0x78d0e7acb5c0 in /export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/lib/libtorch.so)
-frame #3: <unknown function> + 0x9caa4 (0x78d0e889caa4 in /lib/x86_64-linux-gnu/libc.so.6)
-frame #4: <unknown function> + 0x129c6c (0x78d0e8929c6c in /lib/x86_64-linux-gnu/libc.so.6)
-
-W0512 11:54:44.102000 1914204 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1914378 closing signal SIGTERM
-W0512 11:54:44.106000 1914204 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1914379 closing signal SIGTERM
-W0512 11:54:44.107000 1914204 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1914380 closing signal SIGTERM
-W0512 11:54:44.108000 1914204 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1914381 closing signal SIGTERM
-W0512 11:54:44.109000 1914204 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1914382 closing signal SIGTERM
-W0512 11:54:44.109000 1914204 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1914383 closing signal SIGTERM
-W0512 11:54:44.110000 1914204 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1914384 closing signal SIGTERM
-W0512 11:54:44.111000 1914204 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1914385 closing signal SIGTERM
-W0512 11:54:44.111000 1914204 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1914386 closing signal SIGTERM
-E0512 11:54:49.649000 1914204 torch/distributed/elastic/multiprocessing/api.py:869] failed (exitcode: -6) local_rank: 0 (pid: 1914377) of binary: /export/home/rfeliu/sbi_model_comparison/.venv/bin/python
+W0512 12:16:31.504000 1921048 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1921241 closing signal SIGTERM
+W0512 12:16:31.508000 1921048 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1921242 closing signal SIGTERM
+W0512 12:16:31.510000 1921048 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1921243 closing signal SIGTERM
+W0512 12:16:31.511000 1921048 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1921244 closing signal SIGTERM
+W0512 12:16:31.512000 1921048 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1921245 closing signal SIGTERM
+W0512 12:16:31.514000 1921048 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1921247 closing signal SIGTERM
+W0512 12:16:31.517000 1921048 torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1921248 closing signal SIGTERM
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mglocal_ib[0m at: [34mhttps://wandb.ai/rfeliu-iwr/glocal-nlp/runs/pnfw14u7[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20260512_121622-pnfw14u7/logs[0m
+E0512 12:16:32.034000 1921048 torch/distributed/elastic/multiprocessing/api.py:869] failed (exitcode: 1) local_rank: 5 (pid: 1921246) of binary: /export/home/rfeliu/sbi_model_comparison/.venv/bin/python
 Traceback (most recent call last):
   File "/export/home/rfeliu/sbi_model_comparison/.venv/bin/accelerate", line 8, in <module>
     sys.exit(main())
@@ -272,18 +914,18 @@ Traceback (most recent call last):
   File "/export/home/rfeliu/sbi_model_comparison/.venv/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 269, in launch_agent
     raise ChildFailedError(
 torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
-========================================================
+============================================================
 scripts/02_pretrain_glocal.py FAILED
---------------------------------------------------------
+------------------------------------------------------------
 Failures:
   <NO_OTHER_FAILURES>
---------------------------------------------------------
+------------------------------------------------------------
 Root Cause (first observed failure):
 [0]:
-  time      : 2026-05-12_11:54:44
+  time      : 2026-05-12_12:16:31
   host      : compgpu2.iwr.uni-heidelberg.de
-  rank      : 0 (local_rank: 0)
-  exitcode  : -6 (pid: 1914377)
+  rank      : 5 (local_rank: 5)
+  exitcode  : 1 (pid: 1921246)
   error_file: <N/A>
-  traceback : Signal 6 (SIGABRT) received by PID 1914377
-========================================================
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================
