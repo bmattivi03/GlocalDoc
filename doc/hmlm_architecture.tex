@@ -48,14 +48,19 @@
 \begin{tikzpicture}
 
 %% ═══════════════════════════════════════════════════════
-%%  TEACHER track — stop-gradient, full document (x = 0)
+%%  SHARED ENCODER — one RobertaForMaskedLM, three passes
+%% ═══════════════════════════════════════════════════════
+\node[ENC, minimum width=20.8cm, minimum height=1.4cm]
+     (enc) at ( 8, -2.5) {DistilRoBERTa --- \emph{shared encoder} (one \texttt{RobertaForMaskedLM} instance)\\[-2pt]
+                          \footnotesize three forward passes per step · gradient checkpointing · weights identical across passes};
+
+
+%% ═══════════════════════════════════════════════════════
+%%  TEACHER track — stop-gradient pass, full document (x = 0)
 %% ═══════════════════════════════════════════════════════
 
 \node[T]   (t_in)  at ( 0,   0  ) {Full paragraphs $\mathcal{P}$\\[-2pt]
                                     \footnotesize $N$ clean strings};
-
-\node[ENC] (t_enc) at ( 0,  -2.5) {DistilRoBERTa\\[-2pt]
-                                    \footnotesize stop-gradient};
 
 \node[T]   (t_cls) at ( 0,  -5.0) {$\bm{H}_T\in\mathbb{R}^{N\times768}$\\[-2pt]
                                     \footnotesize CLS per paragraph};
@@ -66,21 +71,18 @@
 \node[T]   (t_tg)  at ( 0, -10.0) {$\bar{\bm{H}}_T\in\mathbb{R}^{768}$\\[-2pt]
                                     \footnotesize teacher target (detach)};
 
-\draw[Tarr] (t_in) --(t_enc);
-\draw[Tarr] (t_enc)--(t_cls);
+\draw[Tarr] (t_in.south)               -- (enc.north -| t_in.south);
+\draw[Tarr] (enc.south -| t_cls.north) -- (t_cls.north);
 \draw[Tarr] (t_cls)--(t_mp);
 \draw[Tarr] (t_mp) --(t_tg);
 
 
 %% ═══════════════════════════════════════════════════════
-%%  STUDENT track — trainable, paragraph-dropout (x = 8)
+%%  STUDENT track — trainable pass, paragraph-dropout (x = 8)
 %% ═══════════════════════════════════════════════════════
 
 \node[S]   (s_in)  at ( 8,   0  ) {Kept paragraphs $\mathcal{P}_{\mathrm{kept}}$\\[-2pt]
-                                    \footnotesize $M{<}N$, paragraph-dropout 30\%};
-
-\node[ENC] (s_enc) at ( 8,  -2.5) {DistilRoBERTa\\[-2pt]
-                                    \footnotesize trainable};
+                                    \footnotesize $M{<}N$ · paragraph dropout $30\%$};
 
 \node[S]   (s_cls) at ( 8,  -5.0) {$\bm{H}_S\in\mathbb{R}^{M\times768}$\\[-2pt]
                                     \footnotesize CLS per kept paragraph};
@@ -91,34 +93,31 @@
 \node[S]   (s_zp)  at ( 8, -10.0) {$\bm{z}_{\mathrm{partial}}\in\mathbb{R}^{768}$\\[-2pt]
                                     \footnotesize student partial pool};
 
-\draw[Sarr] (s_in) --(s_enc);
-\draw[Sarr] (s_enc)--(s_cls);
+\draw[Sarr] (s_in.south)               -- (enc.north -| s_in.south);
+\draw[Sarr] (enc.south -| s_cls.north) -- (s_cls.north);
 \draw[Sarr] (s_cls)--(s_pl);
 \draw[Sarr] (s_pl) --(s_zp);
 
 
 %% ═══════════════════════════════════════════════════════
-%%  MLM track — trainable, token-masked (x = 16)
+%%  MLM track — trainable pass, token-masked (x = 16)
 %% ═══════════════════════════════════════════════════════
 
 \node[S]   (m_in)  at (16,   0  ) {Token-masked paragraphs\\[-2pt]
-                                    \footnotesize $N$ strings, 15\% \texttt{<mask>}};
-
-\node[ENC] (m_enc) at (16,  -2.5) {DistilRoBERTa\\[-2pt]
-                                    \footnotesize trainable};
+                                    \footnotesize $N$ strings · MLM $15\%$ (BERT-style $80/10/10$)};
 
 \node[S]   (m_hs)  at (16,  -5.0) {$\bm{H}_M\in\mathbb{R}^{N\times L\times768}$\\[-2pt]
                                     \footnotesize hidden per token};
 
 \node[MLM] (m_lm)  at (16,  -7.5) {LM Head\\[-2pt]
-                                    \footnotesize linear $768\!\to\!V$};
+                                    \footnotesize linear $768\!\to\!V$ · \emph{inside} the shared \texttt{RobertaForMaskedLM}};
 
 \node[S]   (m_lg)  at (16, -10.0) {Logits $\in\mathbb{R}^{N\times L\times V}$\\[-2pt]
                                     \footnotesize per-token vocab dist.};
 
-\draw[Sarr] (m_in) --(m_enc);
-\draw[Sarr] (m_enc)--(m_hs);
-\draw[Sarr] (m_hs) --(m_lm);
+\draw[Sarr] (m_in.south)              -- (enc.north -| m_in.south);
+\draw[Sarr] (enc.south -| m_hs.north) -- (m_hs.north);
+\draw[Sarr] (m_hs)--(m_lm);
 \draw[Sarr] (m_lm) --(m_lg);
 
 
@@ -148,39 +147,22 @@
        \footnotesize $\alpha = 0.5$ \;|\; jointly trains encoder + AttentionPooling};
 
 \draw[Larr, rounded corners=6pt]
-     (l_pp.south)  -- (4,-15.5)  -- (l_tot.west);
+     (l_pp.south)  -- (4,-13) -- (2,-13) -- (2,-15.5) -- (l_tot.west);
 \draw[Larr, rounded corners=6pt]
      (l_mlm.south) -- (16,-15.5) -- (l_tot.east);
 
 
 %% ═══════════════════════════════════════════════════════
-%%  SHARED ENCODER BADGE
+%%  PASS HEADERS — three passes through the SAME encoder
+%%  (no colored backgrounds: there is no teacher/student split,
+%%   just one model invoked three times per step)
 %% ═══════════════════════════════════════════════════════
-\node[draw=eGold, fill=eGold!10, rounded corners=5pt,
-      font=\small\bfseries, text=eGold!80!black, inner sep=5pt]
-     (badge) at ( 8, -1.0) {shared encoder weights};
-
-\draw[eGold!70, dashed, thick] (badge.south west) -- (t_enc.north);
-\draw[eGold!70, dashed, thick] (badge.south)      -- (s_enc.north);
-\draw[eGold!70, dashed, thick] (badge.south east) -- (m_enc.north);
-
-
-%% ═══════════════════════════════════════════════════════
-%%  BACKGROUND PANELS
-%% ═══════════════════════════════════════════════════════
-\begin{scope}[on background layer]
-  %% Teacher panel — right edge hugs L_para_pred at x=2.2
-  \fill[tBlue!6, rounded corners=9pt]
-    (-2.4, 0.7) rectangle ( 2.2,-10.75);
-  \node[tBlue!80!black, font=\bfseries, anchor=north west]
-       at (-2.3,0.7) {Teacher (stop-grad)};
-
-  %% Joint trainable panel — left edge hugs L_para_pred at x=5.8, covers Student + MLM tracks
-  \fill[sGreen!6, rounded corners=9pt]
-    ( 5.8, 0.7) rectangle (18.4,-10.75);
-  \node[sGreen!80!black, font=\bfseries, anchor=north east]
-       at (18.3,0.7) {Trainable encoder + heads};
-\end{scope}
+\node[font=\footnotesize\bfseries, text=tBlue!85!black,  anchor=south]
+     at ( 0, 0.55) {pass 1 · teacher · stop-grad};
+\node[font=\footnotesize\bfseries, text=sGreen!85!black, anchor=south]
+     at ( 8, 0.55) {pass 2 · student · trainable};
+\node[font=\footnotesize\bfseries, text=sGreen!85!black, anchor=south]
+     at (16, 0.55) {pass 3 · MLM · trainable};
 
 
 %% ═══════════════════════════════════════════════════════
@@ -190,14 +172,13 @@
      at (-2.4,-17.5) {%
   \textcolor{tBlue!80}{\rule[0.4ex]{0.5cm}{0.5pt}%
   \,\rule[0.4ex]{0.2cm}{0.5pt}\,\rule[0.4ex]{0.2cm}{0.5pt}}
-  \; stop-gradient (teacher)\qquad
+  \; stop-gradient pass\qquad
   \textcolor{sGreen!80}{\rule[0.4ex]{1.2cm}{0.5pt}}
-  \; trainable\qquad
+  \; trainable pass\qquad
   \textcolor{lossRed}{\rule[0.4ex]{1.2cm}{0.5pt}}
   \; loss signal\qquad
-  \textcolor{eGold!80!black}{\rule[0.4ex]{0.4cm}{0.5pt}%
-  \,\rule[0.4ex]{0.2cm}{0.5pt}\,\rule[0.4ex]{0.2cm}{0.5pt}}
-  \; shared weights
+  \textcolor{eGold!80!black}{\rule[0ex]{0.8cm}{2.5pt}}
+  \; shared encoder (single block above)
 };
 
 \end{tikzpicture}

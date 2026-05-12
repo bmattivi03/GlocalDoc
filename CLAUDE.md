@@ -170,6 +170,7 @@ Fine-tuning: N ∈ {10, 50, 100} × 5 seeds. Results saved to `results/finetunin
 ## Key Invariants
 
 - `distilroberta-base` loads via `RobertaModel.from_pretrained("distilroberta-base")` — no `DistilRobertaModel`.
+- Gradient checkpointing **must** use `use_reentrant=False` (passed via `gradient_checkpointing_kwargs={"use_reentrant": False}`) **and** `encoder.config.use_cache = False`. Both pre-training models call the same encoder multiple times per forward (teacher under `no_grad` + student with grad, plus the MLM head for H-MLM). The legacy reentrant hook silently misaligns saved-vs-recomputed tensors under fp16+GradScaler, producing `CheckpointError: Recomputed values… have different metadata` on the Titan Xp path. bf16 (no GradScaler) hides this — Spark works, Titan Xp blows up.
 - Teacher encoder pass is always `stop_grad=True` (`torch.no_grad()` inside `_encode_paragraphs`).
 - Teacher/student encoding passes are sequential — never simultaneous — to minimize peak VRAM.
 - `log_s` clamped to `[-10, 10]` in every forward pass (prevents numerical explosion).
@@ -192,6 +193,8 @@ Fine-tuning: N ∈ {10, 50, 100} × 5 seeds. Results saved to `results/finetunin
 
 Fallback cluster: 10× NVIDIA TITAN Xp is usable but slower and memory-constrained
 (12GB VRAM, no bf16). Use `BATCH_SIZE=1`, `GRAD_ACCUM=4`, and change Accelerate
-mixed precision from `bf16` to `fp16` or disable mixed precision. If GlocalIB still
-OOMs, sub-batch `_encode_paragraphs()` instead of reducing the 50-paragraph cap.
+mixed precision from `bf16` to `fp16` or disable mixed precision. The gradient
+checkpointing setup already uses `use_reentrant=False` so the fp16+GradScaler path
+no longer trips `CheckpointError`. If GlocalIB still OOMs, sub-batch
+`_encode_paragraphs()` instead of reducing the 50-paragraph cap.
 W&B project: `glocal-nlp`.
