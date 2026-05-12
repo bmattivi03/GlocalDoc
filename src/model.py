@@ -41,6 +41,10 @@ class GlocalIBModel(nn.Module):
         # Separate attention pools: student trains via gradient, teacher updated via EMA.
         self.attn_pool_student = AttentionPooling(dim=768, max_chunks=max_paragraphs)
         self.attn_pool_teacher = AttentionPooling(dim=768, max_chunks=max_paragraphs)
+        # Initialize teacher from student so EMA starts from an identical state on
+        # every rank (otherwise each DDP rank's teacher diverges at step 0 since
+        # the teacher is not gradient-synced).
+        self.attn_pool_teacher.load_state_dict(self.attn_pool_student.state_dict())
         # Teacher attention is never updated by gradient — EMA only.
         for p in self.attn_pool_teacher.parameters():
             p.requires_grad = False
@@ -134,7 +138,7 @@ class GlocalIBModel(nn.Module):
           s_chunks   list[(N, 768)] student all-paragraph reps (for L_local)
           t_chunks   list[(N, 768)] teacher all-paragraph reps (for L_local)
           mu         (B, 256)        IB mean
-          sigma      (B, 256)        IB std
+          log_sigma  (B, 256)        IB log-std (clamped to [-10, 10])
           log_s      (4,)            UW weights (clamped to [-10, 10])
         """
         Z_prime_list   = []
@@ -143,7 +147,7 @@ class GlocalIBModel(nn.Module):
         s_chunks_list  = []
         t_chunks_list  = []
         mu_list        = []
-        sigma_list     = []
+        log_sigma_list = []
 
         for full, masked, kept in zip(full_batch, masked_batch, kept_indices_batch):
             # ── Teacher: stop-grad encoder pass, then teacher attention pool ──
@@ -161,11 +165,12 @@ class GlocalIBModel(nn.Module):
             s_kept    = s_chunks[valid_kept]                               # (M, 768)
             z_partial = self.attn_pool_student(s_kept)                    # (768,)
 
-            # IB bottleneck
-            mu       = self.mu_head(z_partial)                             # (256,)
-            sigma    = torch.exp(self.log_sigma_head(z_partial))           # (256,)
-            z_sample = mu + sigma * torch.randn_like(mu)
-            Z_proj   = self.projector(z_sample)                           # (768,)
+            # IB bottleneck — clamp log_sigma to prevent over/underflow under bf16.
+            mu        = self.mu_head(z_partial)                            # (256,)
+            log_sigma = torch.clamp(self.log_sigma_head(z_partial), -10, 10)  # (256,)
+            sigma     = torch.exp(log_sigma)
+            z_sample  = mu + sigma * torch.randn_like(mu)
+            Z_proj    = self.projector(z_sample)                          # (768,)
 
             Z_prime_list.append(Z_prime)
             Z_proj_list.append(Z_proj)
@@ -173,7 +178,7 @@ class GlocalIBModel(nn.Module):
             s_chunks_list.append(s_chunks)
             t_chunks_list.append(t_chunks)
             mu_list.append(mu)
-            sigma_list.append(sigma)
+            log_sigma_list.append(log_sigma)
 
         log_s = torch.clamp(self.log_s, min=-10, max=10)
 
@@ -184,7 +189,7 @@ class GlocalIBModel(nn.Module):
             s_chunks_list,                # list[Tensor(N, 768)]
             t_chunks_list,                # list[Tensor(N, 768)]
             torch.stack(mu_list),         # (B, 256)
-            torch.stack(sigma_list),      # (B, 256)
+            torch.stack(log_sigma_list),  # (B, 256)
             log_s,                        # (4,)
         )
 
@@ -246,8 +251,9 @@ class DocumentClassifier(nn.Module):
         return torch.stack([cls_vecs[s:e].mean(0) for s, e in boundaries])
 
     def forward(self, paragraphs_batch: list) -> torch.Tensor:
+        """Returns raw logits (B, num_labels). Apply sigmoid at eval / use BCEWithLogitsLoss at train."""
         doc_vecs = torch.stack([
             self.attn_pool(self._encode_paragraphs(paras))
             for paras in paragraphs_batch
         ])                                               # (B, 768)
-        return torch.sigmoid(self.classifier(doc_vecs)) # (B, num_labels)
+        return self.classifier(doc_vecs)                # (B, num_labels) — logits

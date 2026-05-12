@@ -4,7 +4,7 @@ import numpy as np
 from collections import Counter
 
 sys.path.append(".")
-from src.data import load_ecthr, mask_paragraphs
+from src.data import load_ecthr, get_paragraph_mask, mask_text
 
 print("Loading dataset...")
 dataset = load_ecthr()
@@ -26,15 +26,17 @@ dist = dict(sorted(Counter(all_labels).items()))
 print(f"\nLabel distribution: {dist}")
 print("(Article 3 = label 3 has ~4704 cases, Article 5 = label 5 has ~41 — severe imbalance)")
 
-# Masking sanity check
+# Masking sanity check — uses v3 API: word/sentence masking + paragraph dropout
 full = ex["text"]
-masked, indices = mask_paragraphs(full)
+kept_indices = get_paragraph_mask(len(full))
+masked_paras = [mask_text(p) for p in full]
 print(f"\nMasking check on first training doc:")
-print(f"  Full    : {len(full)} paragraphs")
-print(f"  Kept    : {len(masked)} paragraphs ({len(masked)/len(full):.0%})")
-print(f"  Indices : {indices[:8]}{'...' if len(indices) > 8 else ''}")
-assert len(masked) >= 1, "Masking removed all paragraphs!"
-assert len(masked) < len(full), "Masking kept everything — check mask_ratio!"
+print(f"  Full         : {len(full)} paragraphs")
+print(f"  Kept (pool)  : {len(kept_indices)} ({len(kept_indices)/len(full):.0%})")
+print(f"  Indices      : {kept_indices[:8]}{'...' if len(kept_indices) > 8 else ''}")
+print(f"  Para 0 word-masked preview: {masked_paras[0][:120]}...")
+assert len(kept_indices) >= 1, "Paragraph dropout removed all paragraphs!"
+assert len(kept_indices) < len(full), "Paragraph dropout kept everything — check dropout_rate!"
 print("Sanity checks passed!")
 
 # Save histogram (no display — safe for SSH)

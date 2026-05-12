@@ -7,9 +7,13 @@ def alignment_loss(z1: torch.Tensor, z2: torch.Tensor) -> torch.Tensor:
     return 1.0 - F.cosine_similarity(z1, z2, dim=-1).mean()
 
 
-def compression_loss(mu: torch.Tensor, sigma: torch.Tensor) -> torch.Tensor:
-    """KL( N(mu, sigma²) ∥ N(0,1) ) closed form. mu, sigma: (B, H)."""
-    return -0.5 * (1 + 2 * torch.log(sigma) - mu.pow(2) - sigma.pow(2)).sum(-1).mean()
+def compression_loss(mu: torch.Tensor, log_sigma: torch.Tensor) -> torch.Tensor:
+    """KL( N(mu, sigma²) ∥ N(0,1) ) closed form. mu, log_sigma: (B, H).
+
+    Computed directly from log_sigma to stay numerically stable under bf16:
+    -0.5 * (1 + 2·log_σ − μ² − exp(2·log_σ))
+    """
+    return -0.5 * (1 + 2 * log_sigma - mu.pow(2) - torch.exp(2 * log_sigma)).sum(-1).mean()
 
 
 def glocal_ib_loss(
@@ -19,7 +23,7 @@ def glocal_ib_loss(
     s_chunks:  list,           # list[Tensor(N, 768)] student all-para reps
     t_chunks:  list,           # list[Tensor(N, 768)] teacher all-para reps
     mu:        torch.Tensor,   # (B, 256)
-    sigma:     torch.Tensor,   # (B, 256)
+    log_sigma: torch.Tensor,   # (B, 256) clamped log-σ
     log_s:     torch.Tensor,   # (4,) clamped UW weights [compress, local, inter, global]
 ):
     """
@@ -32,7 +36,7 @@ def glocal_ib_loss(
 
     Returns (total, l_compress, l_local, l_inter, l_global).
     """
-    l_compress = compression_loss(mu, sigma)
+    l_compress = compression_loss(mu, log_sigma)
     l_local    = alignment_loss(torch.cat(s_chunks), torch.cat(t_chunks))
     l_inter    = alignment_loss(z_partial, Z_prime.detach())
     l_global   = alignment_loss(Z_proj,    Z_prime.detach())

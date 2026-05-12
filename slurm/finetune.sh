@@ -1,7 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=finetune
 #SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --partition=spark           # ← confirm partition name with lab admin
 #SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
 #SBATCH --mem=32G
 #SBATCH --output=logs/finetune_%j.out
@@ -10,7 +13,6 @@
 source ~/.bashrc
 conda activate glocal_nlp
 cd /path/to/GlocalDoc               # ← update before submitting
+mkdir -p logs
 
-jupyter nbconvert --to notebook --execute notebooks/04_finetune.ipynb \
-    --output notebooks/04_finetune_executed.ipynb \
-    --ExecutePreprocessor.timeout=86400
+python scripts/04_finetune.py

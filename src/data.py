@@ -101,4 +101,11 @@ def sample_few_shot(dataset_split, n_per_class: int, seed: int, num_classes: int
         if all(len(pc) >= n_per_class for pc in per_class):
             break
 
+    # Surface rare-class shortfalls — label 5 in ECtHR has only ~41 train examples,
+    # so n_per_class=100 will silently undersample without this warning.
+    shortfall = [(c, len(pc)) for c, pc in enumerate(per_class) if len(pc) < n_per_class]
+    if shortfall:
+        details = ", ".join(f"class {c}: {got}/{n_per_class}" for c, got in shortfall)
+        print(f"[sample_few_shot] WARN seed={seed}: undersampled — {details}")
+
     return [dataset_split[i] for i in sorted(selected_set)]
