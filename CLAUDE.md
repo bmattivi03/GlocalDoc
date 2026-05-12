@@ -133,4 +133,8 @@ Fine-tuning: N ∈ {10, 50, 100} × 5 seeds. Metric: **macro-F1** (mandatory —
 | Fine-tuning / exploration | 1× 32GB GPU | `BATCH_SIZE=4` |
 | Sanity checks | CPU | no GPU required |
 
-On 10× 11GB GPUs: keep `BATCH_SIZE=1`, `GRAD_ACCUM=4` → effective batch 40. W&B project: `glocal-nlp`.
+Fallback cluster: 10× NVIDIA TITAN Xp is usable but slower and memory-constrained
+(12GB VRAM, no bf16). Use `BATCH_SIZE=1`, `GRAD_ACCUM=4`, and change Accelerate
+mixed precision from `bf16` to `fp16` or disable mixed precision. If GlocalIB still
+OOMs, sub-batch `_encode_paragraphs()` instead of reducing the 50-paragraph cap.
+W&B project: `glocal-nlp`.
