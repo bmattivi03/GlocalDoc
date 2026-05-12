@@ -1,14 +1,24 @@
 import os
 os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")  # silence unauth-request warning
+# Titan Xp has no NVLink — PCIe-only P2P deadlocks the DDP param broadcast at startup.
+# Force NCCL onto shared-memory/socket transports; harmless on NVLink hardware.
+os.environ.setdefault("NCCL_P2P_DISABLE", "1")
+os.environ.setdefault("NCCL_IB_DISABLE", "1")
+# Surface NCCL hangs as readable errors instead of silent 10-min timeouts.
+os.environ.setdefault("TORCH_NCCL_BLOCKING_WAIT", "1")
+os.environ.setdefault("TORCH_NCCL_ASYNC_ERROR_HANDLING", "1")
+
+import sys
+from datetime import timedelta
 
 import torch
+import torch.distributed as dist
 import wandb
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 import transformers
 from transformers import get_linear_schedule_with_warmup
-from accelerate import Accelerator
-import sys
+from accelerate import Accelerator, InitProcessGroupKwargs
 
 # Suppress benign per-paragraph warnings (long tokens are sub-chunked manually,
 # use_cache is explicitly disabled alongside gradient checkpointing).
@@ -36,21 +46,35 @@ def collate_fn(batch):
 
 
 def train():
+    # 30-min collective timeout: protects against a slow first step (kernel JIT,
+    # long-doc encode) tripping the default 10-min NCCL watchdog and killing the run.
     accelerator = Accelerator(
         mixed_precision="fp16",
         gradient_accumulation_steps=GRAD_ACCUM,
+        kwargs_handlers=[InitProcessGroupKwargs(timeout=timedelta(minutes=30))],
     )
     device = accelerator.device
 
     if accelerator.is_main_process:
+        print(
+            f"[launch] world_size={accelerator.num_processes} "
+            f"mixed_precision={accelerator.mixed_precision} "
+            f"device={device}",
+            flush=True,
+        )
+        os.makedirs("checkpoints", exist_ok=True)
         wandb.init(project=WANDB_PROJECT, name=CONDITION, config={
             "condition":   CONDITION,
             "epochs":      EPOCHS,
             "batch_size":  BATCH_SIZE,
             "grad_accum":  GRAD_ACCUM,
+            "world_size":  accelerator.num_processes,
             "lr":          LR,
             "ema_tau":     EMA_TAU,
         })
+    # Block non-main ranks until main has created checkpoints/ — avoids a race
+    # at the first accelerator.save_state() call.
+    accelerator.wait_for_everyone()
 
     dataset = load_ecthr()
     model   = GlocalIBModel(ema_tau=EMA_TAU, device=str(device))
@@ -65,6 +89,17 @@ def train():
     scheduler    = get_linear_schedule_with_warmup(opt, warmup_steps, total_steps)
 
     model, opt, loader, scheduler = accelerator.prepare(model, opt, loader, scheduler)
+
+    # DDP only broadcasts trainable params at construction. The teacher attention
+    # pool has requires_grad=False (EMA-only), so its random init differs across
+    # ranks. Explicitly broadcast rank-0's teacher params so all ranks start
+    # from an identical teacher — otherwise step-0 L_local/L_global rep targets
+    # are rank-dependent until EMA converges.
+    if accelerator.num_processes > 1:
+        unwrapped = accelerator.unwrap_model(model)
+        for p in unwrapped.attn_pool_teacher.parameters():
+            dist.broadcast(p.data, src=0)
+        accelerator.wait_for_everyone()
 
     global_step = 0
     for epoch in range(EPOCHS):
@@ -119,7 +154,7 @@ def train():
                         "log_s_global":   log_s[3].item(),
                         "lr":             scheduler.get_last_lr()[0],
                         "epoch":          epoch,
-                        "progress":       accelerator.get_progress_bar_dict()["progress"],
+                        "progress":       global_step / max(1, total_steps),
                         "step":           global_step,
                     })
 
