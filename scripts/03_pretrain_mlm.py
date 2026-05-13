@@ -1,18 +1,29 @@
 import os
 os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")  # silence unauth-request warning
+# Force NCCL onto shared-memory/socket transports (matches scripts/02). Harmless on
+# NVLink hardware and single GPU; protects against PCIe-only P2P deadlocks elsewhere.
+os.environ.setdefault("NCCL_P2P_DISABLE", "1")
+os.environ.setdefault("NCCL_IB_DISABLE", "1")
+os.environ.setdefault("TORCH_NCCL_BLOCKING_WAIT", "1")
+os.environ.setdefault("TORCH_NCCL_ASYNC_ERROR_HANDLING", "1")
+
+import sys
+import time
+from collections import deque
+from datetime import timedelta
 
 import torch
 import torch.nn as nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 import transformers
 from transformers import (
     RobertaForMaskedLM, RobertaTokenizerFast,
     DataCollatorForLanguageModeling,
     get_linear_schedule_with_warmup,
 )
-from accelerate import Accelerator
-import sys
+from accelerate import Accelerator, InitProcessGroupKwargs
 
 transformers.logging.set_verbosity_error()
 
@@ -21,15 +32,18 @@ from src.data import load_ecthr, get_paragraph_mask
 from src.model import AttentionPooling
 from src.loss import alignment_loss
 
-# --- CONFIG ---
+# ── CONFIG ────────────────────────────────────────────────────────────────────
 EPOCHS        = 3
 BATCH_SIZE    = 1       # per GPU; 1 doc per step (para count varies)
 GRAD_ACCUM    = 4
 LR            = 5e-5
 MAX_GRAD_NORM = 1.0
 ALPHA         = 0.5     # weight on L_mlm; (1-ALPHA) on L_para_pred
+LOG_EVERY     = 1       # W&B log frequency (optimizer steps)
+PRINT_EVERY   = 50      # stdout summary frequency (optimizer steps)
 WANDB_PROJECT = "glocal-nlp"
 CONDITION     = "h_mlm"
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 def collate_fn(batch):
@@ -87,22 +101,33 @@ class HMLMTrainer(nn.Module):
 
 
 def train():
+    # 30-min collective timeout — slow first step under JIT shouldn't kill the run.
     accelerator = Accelerator(
         mixed_precision="bf16",
         gradient_accumulation_steps=GRAD_ACCUM,
+        kwargs_handlers=[InitProcessGroupKwargs(timeout=timedelta(minutes=30))],
     )
     device = accelerator.device
 
     if accelerator.is_main_process:
+        print(
+            f"[launch] world_size={accelerator.num_processes} "
+            f"mixed_precision={accelerator.mixed_precision} "
+            f"device={device}",
+            flush=True,
+        )
+        os.makedirs("checkpoints", exist_ok=True)
         import wandb
         wandb.init(project=WANDB_PROJECT, name=CONDITION, config={
             "condition":  CONDITION,
             "epochs":     EPOCHS,
             "batch_size": BATCH_SIZE,
             "grad_accum": GRAD_ACCUM,
+            "world_size": accelerator.num_processes,
             "lr":         LR,
             "alpha":      ALPHA,
         })
+    accelerator.wait_for_everyone()
 
     tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
     encoder_mlm = RobertaForMaskedLM.from_pretrained("distilroberta-base")
@@ -129,11 +154,34 @@ def train():
         trainer, opt, loader, scheduler
     )
 
-    global_step = 0
+    if accelerator.is_main_process:
+        print(
+            f"[plan] total_steps={total_steps} warmup_steps={warmup_steps} "
+            f"len(loader)={len(loader)}",
+            flush=True,
+        )
+
+    global_step   = 0
+    step_times    = deque(maxlen=50)
+    t_train_start = time.time()
+
     for epoch in range(EPOCHS):
         trainer.train()
 
-        for doc_batch in loader:
+        loader_iter = loader
+        pbar = None
+        if accelerator.is_main_process:
+            pbar = tqdm(
+                loader,
+                desc=f"epoch {epoch + 1}/{EPOCHS}",
+                leave=False,
+                dynamic_ncols=True,
+            )
+            loader_iter = pbar
+
+        opt_step_start = time.time()
+
+        for doc_batch in loader_iter:
             paragraphs = doc_batch[0]   # BATCH_SIZE=1 → single document
 
             # MLM-masked paragraphs
@@ -169,29 +217,78 @@ def train():
                 )
                 total = ALPHA * l_mlm + (1.0 - ALPHA) * l_para
                 accelerator.backward(total)
+
+                grad_norm = None
                 if accelerator.sync_gradients:
-                    accelerator.clip_grad_norm_(trainer.parameters(), MAX_GRAD_NORM)
+                    grad_norm = accelerator.clip_grad_norm_(trainer.parameters(), MAX_GRAD_NORM)
+
                 opt.step()
                 scheduler.step()
                 opt.zero_grad()
 
             if accelerator.sync_gradients:
                 global_step += 1
-                if global_step % 50 == 0 and accelerator.is_main_process:
-                    import wandb
-                    wandb.log({
-                        "total_loss": total.item(),
-                        "l_mlm":      l_mlm.item(),
-                        "l_para":     l_para.item(),
-                        "lr":         scheduler.get_last_lr()[0],
-                        "epoch":      epoch,
-                        "step":       global_step,
-                    })
+                step_dt = time.time() - opt_step_start
+                opt_step_start = time.time()
+                step_times.append(step_dt)
+                avg_step = sum(step_times) / len(step_times)
+                eta_sec  = avg_step * max(0, total_steps - global_step)
+
+                if accelerator.is_main_process:
+                    if torch.cuda.is_available():
+                        gpu_mem_gb = torch.cuda.max_memory_allocated() / 1e9
+                        torch.cuda.reset_peak_memory_stats()
+                    else:
+                        gpu_mem_gb = 0.0
+
+                    grad_norm_value = grad_norm.item() if grad_norm is not None else 0.0
+                    ppl = float(torch.exp(l_mlm.detach()).clamp(max=1e6))
+
+                    if global_step % LOG_EVERY == 0:
+                        import wandb
+                        wandb.log({
+                            "total_loss":       total.item(),
+                            "l_mlm":            l_mlm.item(),
+                            "l_para":           l_para.item(),
+                            "mlm_perplexity":   ppl,
+                            "lr":               scheduler.get_last_lr()[0],
+                            "grad_norm":        grad_norm_value,
+                            "sec_per_step":     avg_step,
+                            "examples_per_sec": (BATCH_SIZE * GRAD_ACCUM * accelerator.num_processes) / max(avg_step, 1e-9),
+                            "gpu_mem_gb":       gpu_mem_gb,
+                            "eta_min":          eta_sec / 60.0,
+                            "elapsed_min":      (time.time() - t_train_start) / 60.0,
+                            "epoch":            epoch,
+                            "progress":         global_step / max(1, total_steps),
+                            "step":             global_step,
+                        })
+
+                    if pbar is not None:
+                        pbar.set_postfix({
+                            "loss": f"{total.item():.3f}",
+                            "mlm":  f"{l_mlm.item():.3f}",
+                            "ppl":  f"{ppl:.1f}",
+                            "para": f"{l_para.item():.3f}",
+                        })
+
+                    if global_step % PRINT_EVERY == 0:
+                        print(
+                            f"[step {global_step}/{total_steps}] "
+                            f"loss={total.item():.3f}  "
+                            f"l_mlm={l_mlm.item():.3f} (ppl={ppl:.1f})  "
+                            f"l_para={l_para.item():.3f}  "
+                            f"grad={grad_norm_value:.2f} mem={gpu_mem_gb:.1f}GB  "
+                            f"sec/step={avg_step:.2f} eta={eta_sec/60:.1f}min",
+                            flush=True,
+                        )
+
+        if pbar is not None:
+            pbar.close()
 
         accelerator.wait_for_everyone()
         if accelerator.is_main_process:
-            print(f"Epoch {epoch} done.")
-            os.makedirs("checkpoints", exist_ok=True)
+            elapsed_min = (time.time() - t_train_start) / 60.0
+            print(f"Epoch {epoch} done.  elapsed={elapsed_min:.1f}min", flush=True)
             unwrapped = accelerator.unwrap_model(trainer)
             torch.save(
                 {
@@ -200,7 +297,7 @@ def train():
                 },
                 f"checkpoints/{CONDITION}_epoch{epoch + 1}.pt",
             )
-            print(f"  Saved → checkpoints/{CONDITION}_epoch{epoch + 1}.pt")
+            print(f"  Saved → checkpoints/{CONDITION}_epoch{epoch + 1}.pt", flush=True)
 
     if accelerator.is_main_process:
         import wandb
