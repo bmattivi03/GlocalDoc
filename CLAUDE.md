@@ -62,13 +62,16 @@ print('H-MLM OK')
 # Data exploration (prints stats, saves histogram to results/)
 python scripts/01_data_exploration.py
 
-# Pre-train GlocalIB — single GPU
-python scripts/02_pretrain_glocal.py        # edit CONDITION at top first
+# Pre-train GlocalIB — single 32GB GPU (current default)
+accelerate launch --num_processes=1 scripts/02_pretrain_glocal.py
 
 # Pre-train GlocalIB — multi-GPU (e.g. 4 GPUs)
 accelerate launch --num_processes=4 scripts/02_pretrain_glocal.py
 
-# Pre-train H-MLM baseline
+# Pre-train H-MLM baseline — single 32GB GPU (current default)
+accelerate launch --num_processes=1 scripts/03_pretrain_mlm.py
+
+# Pre-train H-MLM baseline — multi-GPU
 accelerate launch --num_processes=4 scripts/03_pretrain_mlm.py
 
 # Fine-tune all conditions × N × seeds → results/finetuning_results.json
@@ -97,13 +100,21 @@ Xm (masked) → encoder (trainable) → N student reps
 ### GlocalIB Four-component loss with Homoscedastic Uncertainty Weighting
 
 ```
-L = (L_compress · exp(−s₀) + s₀)   # KL( N(μ,σ²) ∥ N(0,1) )
+L_compress_raw = max(per-dim KL( N(μ,σ²) ∥ N(0,1) ), FREE_BITS_NATS).sum(-1).mean()
+L_compress     = β(step) · L_compress_raw
+
+L = (L_compress · exp(−s₀) + s₀)
   + (L_local   · exp(−s₁) + s₁)   # cosine dist: all N student para reps vs teacher para reps
   + (L_inter   · exp(−s₂) + s₂)   # cosine dist: student M-para pool vs teacher full-doc (pre-IB)
   + (L_global  · exp(−s₃) + s₃)   # cosine dist: Z_proj vs Z_prime (post-IB)
 
 log_s = nn.Parameter(torch.zeros(4))   # clamped to [-10, 10]
 ```
+
+Two non-obvious stability mechanisms:
+
+- **β-warmup (`BETA_KL_WARMUP_FRAC`, default 0.25):** `β` ramps linearly from 0 to `BETA_KL_FINAL` over the first 25% of optimizer steps. Without it, the KL term (~100 nats at init) dominates the gradient under near-uniform UW weights and crushes μ before alignment losses can shape the bottleneck. β is applied to the raw KL **before** stacking into the UW vector, so `log_s_compress` adapts to whatever scale β·KL settles at.
+- **Hard elementwise free bits (`FREE_BITS_NATS`, default 0.5 nats/dim):** per-dim KL is clamped to a minimum of λ. Below the floor the gradient through the clamp is zero — the encoder is never penalized for using *at least* λ nats per dim. Floors total KL at λ · 256 = 128 nats and prevents the bottleneck from re-collapsing to N(0,1) once β = 1.
 
 EMA update: `model.update_teacher_ema()` called after every `optimizer.step()`.
 
@@ -154,9 +165,9 @@ Fine-tuning (`scripts/04_finetune.py`) loads H-MLM encoder with `RobertaModel.fr
 - `AttentionPooling(dim=768, max_chunks=50)` — learnable query + positional embeddings, zero-init → starts as mean pooling
 
 **`src/loss.py`**
-- `glocal_ib_loss(Z_prime, Z_proj, z_partial, s_chunks, t_chunks, mu, log_sigma, log_s)` → `(total, l_compress, l_local, l_inter, l_global)`
+- `glocal_ib_loss(Z_prime, Z_proj, z_partial, s_chunks, t_chunks, mu, log_sigma, log_s, beta_kl=1.0, free_bits_nats=0.5)` → `(total, l_compress, l_local, l_inter, l_global)` — `l_compress` returned is the β-scaled, free-bits-clamped KL (i.e., the value that entered the UW stack)
 - `alignment_loss(z1, z2)` — `1 − mean cosine similarity`, expects `(N, D)` tensors
-- `compression_loss(mu, log_sigma)` — KL divergence closed form, computed directly from `log_sigma` to stay finite under bf16
+- `compression_loss(mu, log_sigma, free_bits_nats=0.0)` — KL divergence closed form computed from `log_sigma` (finite under bf16). With `free_bits_nats > 0`, per-dim KL is clamped to ≥ λ — hard elementwise free bits (variant of Kingma 2016) — preventing posterior collapse
 
 ## Experimental Conditions
 
@@ -176,8 +187,10 @@ Fine-tuning: N ∈ {10, 50, 100} × 5 seeds. Results saved to `results/finetunin
 - `log_s` clamped to `[-10, 10]` in every forward pass (prevents numerical explosion).
 - `update_teacher_ema()` must be called after every `optimizer.step()` — not inside `forward`.
 - Both pre-training scripts use `get_linear_schedule_with_warmup` with 10% warmup steps over total training steps. GlocalIB LR=1e-5, H-MLM LR=5e-5. The schedulers are `accelerator.prepare()`d alongside the optimizer.
+- **GlocalIB optimizer has two AdamW param groups:** the encoder + heads at LR=1e-5, and `log_s` alone at LR=1e-2 with `weight_decay=0.0`. UW requires this — at the encoder's LR, `log_s` can move at most ~0.04 over a full run and the four UW multipliers stay ≈ 1.0 (degenerate). The 1000× LR plus zero weight decay lets `log_s` converge to ≈ `log(L_i)` and actually rebalance the losses. The W&B `lr` field reads group 0 (encoder); `lr_log_s` reads group 1.
 - Before submitting SLURM jobs, update `cd /path/to/GlocalDoc` in all three `slurm/*.sh` scripts to the actual cluster path. Also confirm the `spark` partition name with the lab admin.
-- If all four `log_s` stay near 0 through epoch 2, UW is degenerate — flag it, don't ignore. The W&B run also logs `uw_contrib_{compress,local,inter,global}` (raw loss × UW multiplier) to make this visible.
+- If all four `log_s` stay near 0 through epoch 2, UW is degenerate — flag it, don't ignore. The W&B run also logs `uw_contrib_{compress,local,inter,global}` (raw loss × UW multiplier) and the raw `uw_weight_*` multipliers to make this visible.
+- **Collapse alarm — `active_kl_dims`:** fraction of latent dims with per-dim KL above the free-bits floor. Should stay > 0.5 throughout training. If it drops toward 0, the bottleneck has collapsed past the floor (mathematically shouldn't happen with hard free bits — investigate). Pair with `mu_abs_mean` and `kl_per_dim_mean` for a full bottleneck health picture.
 - Fine-tune `run_few_shot` calls `seed_everything(seed)` *before* sampling and *before* constructing the `DocumentClassifier`. Without this, the classifier head's `nn.Linear` init doesn't depend on `seed` and the 5 "seeds" collapse to varying only the sampled few-shot set.
 - SLURM scripts use `ntasks-per-node=1` because `accelerate launch --num_processes=N` spawns its own worker processes. Using `ntasks-per-node=N` produces N×N processes fighting over N GPUs.
 - `scripts/` contains standalone Python equivalents of all notebooks (SSH/cluster friendly). Notebooks in `notebooks/` are kept for interactive use.
@@ -186,10 +199,14 @@ Fine-tuning: N ∈ {10, 50, 100} × 5 seeds. Results saved to `results/finetunin
 
 | Job | Recommended | Batch config |
 |-----|------------|-------------|
-| GlocalIB pre-training | 4× A100 (Spark) | `BATCH_SIZE=1`, `GRAD_ACCUM=4` → effective 16 |
-| H-MLM pre-training | 4× A100 (Spark) | `BATCH_SIZE=1`, `GRAD_ACCUM=4` (paragraph-by-paragraph) |
+| GlocalIB pre-training | 1× 32GB GPU (Ampere or newer) | `BATCH_SIZE=1`, `GRAD_ACCUM=8`, `bf16` |
+| H-MLM pre-training | 1× 32GB GPU (Ampere or newer) | `BATCH_SIZE=1`, `GRAD_ACCUM=4`, `bf16` |
+| GlocalIB pre-training (multi-GPU) | 4× A100 (Spark) | `BATCH_SIZE=1`, `GRAD_ACCUM=4` → effective 16 |
+| H-MLM pre-training (multi-GPU) | 4× A100 (Spark) | `BATCH_SIZE=1`, `GRAD_ACCUM=4` (paragraph-by-paragraph) |
 | Fine-tuning / exploration | 1× 32GB GPU | single example per step |
 | Sanity checks | CPU | no GPU required |
+
+The 32GB single-GPU rows are the current default — both scripts use `mixed_precision="bf16"` and `--num_processes=1`. The `dist.broadcast` block in GlocalIB and Accelerate's DDP wiring are gated on `num_processes > 1` and no-op on single GPU.
 
 Fallback cluster: 10× NVIDIA TITAN Xp is usable but slower and memory-constrained
 (12GB VRAM, no bf16). Use `BATCH_SIZE=1`, `GRAD_ACCUM=4`, and change Accelerate
