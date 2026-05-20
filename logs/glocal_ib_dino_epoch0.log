@@ -1,0 +1,28 @@
+$ accelerate launch --num_processes=1 scripts/02_pretrain_glocal.py
+[launch] world_size=1 mixed_precision=bf16 device=cuda
+wandb: Tracking run with wandb version 0.26.1
+wandb: W&B syncing is set to `offline` (run id zwd478lk)
+[plan] total_steps=5120 warmup_steps=512 β_warmup_steps≈1280 len(loader)=8197
+
+[step 50/5120]   loss=22.678  l_c=1.0  l_l=0.0506 l_i=1.0252 l_g=1.071  l_v=0.392 l_cov=0.669  l_vZ=0.223 l_vμ=0.465  log_s=[-0.01,-0.02, 0.00, 0.00]  β=0.04 act_kl=0.69 μ|·|=0.215  coll=0.424 zp_coll=-0.027 sqrat=1.49  grad= 7.98 mem=5.0GB  sec/step=0.70 eta=58.8min
+[step 100/5120]  loss=20.700  l_c=1.0  l_l=0.4183 l_i=1.0621 l_g=0.973  l_v=0.219 l_cov=1.713  l_vZ=0.198 l_vμ=0.427  log_s=[-0.04,-0.08,-0.01,-0.00]  β=0.08 act_kl=0.08 μ|·|=0.121  coll=0.374 zp_coll=-0.022 sqrat=1.58  grad=10.98 mem=7.4GB  sec/step=0.65 eta=54.2min
+[step 150/5120]  loss=20.078  l_c=1.5  l_l=0.2875 l_i=0.9348 l_g=0.941  l_v=0.110 l_cov=6.434  l_vZ=0.198 l_vμ=0.412  log_s=[ 0.02,-0.14,-0.02,-0.00]  β=0.12 act_kl=0.02 μ|·|=0.096  coll=0.333 zp_coll=-0.034 sqrat=1.63  grad= 6.18 mem=4.8GB  sec/step=0.71 eta=59.0min
+[step 200/5120]  loss=19.515  l_c=2.1  l_l=0.1973 l_i=0.9185 l_g=0.948  l_v=0.105 l_cov=5.843  l_vZ=0.188 l_vμ=0.389  log_s=[ 0.19,-0.26,-0.04, 0.00]  β=0.16 act_kl=0.17 μ|·|=0.121  coll=0.270 zp_coll=-0.010 sqrat=1.55  grad=13.62 mem=8.9GB  sec/step=0.64 eta=52.7min
+[step 250/5120]  loss=19.063  l_c=2.7  l_l=0.1891 l_i=0.9494 l_g=1.011  l_v=0.123 l_cov=3.535  l_vZ=0.172 l_vμ=0.374  log_s=[ 0.43,-0.40,-0.05,-0.01]  β=0.19 act_kl=0.14 μ|·|=0.147  coll=0.263 zp_coll= 0.006 sqrat=1.62  grad=11.55 mem=6.7GB  sec/step=0.69 eta=55.9min
+[step 300/5120]  loss=18.745  l_c=3.0  l_l=0.1947 l_i=0.8559 l_g=0.968  l_v=0.075 l_cov=4.020  l_vZ=0.164 l_vμ=0.386  log_s=[ 0.71,-0.60,-0.12,-0.03]  β=0.23 act_kl=0.01 μ|·|=0.082  coll=0.230 zp_coll=-0.027 sqrat=1.48  grad= 5.28 mem=5.5GB  sec/step=0.65 eta=52.6min
+[step 350/5120]  loss=19.047  l_c=3.5  l_l=0.2143 l_i=1.0227 l_g=1.045  l_v=0.077 l_cov=3.974  l_vZ=0.164 l_vμ=0.384  log_s=[ 0.97,-0.83,-0.28,-0.04]  β=0.27 act_kl=0.00 μ|·|=0.066  coll=0.222 zp_coll= 0.055 sqrat=2.07  grad= 5.80 mem=7.6GB  sec/step=0.69 eta=54.8min
+[step 400/5120]  loss=18.269  l_c=4.0  l_l=0.1812 l_i=0.8272 l_g=0.919  l_v=0.090 l_cov=3.464  l_vZ=0.156 l_vμ=0.370  log_s=[ 1.15,-1.02,-0.42,-0.11]  β=0.31 act_kl=0.03 μ|·|=0.074  coll=0.209 zp_coll=-0.017 sqrat=1.53  grad=19.13 mem=4.4GB  sec/step=0.69 eta=54.2min
+[step 450/5120]  loss=17.376  l_c=4.5  l_l=0.1793 l_i=0.6434 l_g=0.758  l_v=0.078 l_cov=3.961  l_vZ=0.141 l_vμ=0.334  log_s=[ 1.31,-1.20,-0.49,-0.15]  β=0.35 act_kl=0.00 μ|·|=0.081  coll=0.161 zp_coll= 0.124 sqrat=2.04  grad=16.35 mem=5.4GB  sec/step=0.69 eta=53.8min
+[step 500/5120]  loss=18.694  l_c=5.0  l_l=0.1632 l_i=1.2423 l_g=1.064  l_v=0.079 l_cov=5.426  l_vZ=0.134 l_vμ=0.332  log_s=[ 1.46,-1.38,-0.66,-0.24]  β=0.39 act_kl=0.00 μ|·|=0.100  coll=0.107 zp_coll=-0.020 sqrat=1.61  grad= 7.57 mem=8.0GB  sec/step=0.70 eta=54.2min
+[step 550/5120]  loss=17.813  l_c=5.6  l_l=0.1717 l_i=0.6117 l_g=0.832  l_v=0.079 l_cov=5.264  l_vZ=0.146 l_vμ=0.343  log_s=[ 1.60,-1.57,-0.73,-0.35]  β=0.43 act_kl=0.05 μ|·|=0.115  coll=0.081 zp_coll=-0.031 sqrat=1.45  grad= 8.08 mem=5.7GB  sec/step=0.66 eta=50.5min
+[step 600/5120]  loss=17.158  l_c=6.0  l_l=0.1353 l_i=0.3221 l_g=0.783  l_v=0.089 l_cov=4.463  l_vZ=0.131 l_vμ=0.307  log_s=[ 1.71,-1.72,-0.70,-0.34]  β=0.47 act_kl=0.01 μ|·|=0.109  coll=0.032 zp_coll= 0.049 sqrat=1.71  grad= 6.78 mem=8.9GB  sec/step=0.70 eta=52.5min
+[step 650/5120]  loss=17.375  l_c=6.5  l_l=0.1130 l_i=0.1197 l_g=0.382  l_v=0.139 l_cov=3.124  l_vZ=0.126 l_vμ=0.288  log_s=[ 1.81,-1.86,-0.89,-0.38]  β=0.51 act_kl=0.02 μ|·|=0.189  coll=0.168 zp_coll= 0.050 sqrat=1.56  grad= 7.98 mem=7.0GB  sec/step=0.65 eta=48.5min
+[step 700/5120]  loss=20.407  l_c=7.0  l_l=0.0838 l_i=1.4786 l_g=1.522  l_v=0.079 l_cov=7.801  l_vZ=0.175 l_vμ=0.319  log_s=[ 1.88,-1.95,-0.87,-0.34]  β=0.55 act_kl=0.01 μ|·|=0.088  coll=0.108 zp_coll= 0.033 sqrat=1.71  grad=31.39 mem=4.6GB  sec/step=0.67 eta=49.0min
+[step 750/5120]  loss=16.353  l_c=12.3 l_l=0.1113 l_i=0.0894 l_g=0.270  l_v=0.138 l_cov=5.329  l_vZ=0.141 l_vμ=0.286  log_s=[ 1.97,-2.05,-0.96,-0.43]  β=0.59 act_kl=0.79 μ|·|=0.369  coll=0.038 zp_coll=-0.051 sqrat=1.57  grad=14.86 mem=5.1GB  sec/step=0.68 eta=49.5min
+[step 800/5120]  loss=16.547  l_c=8.0  l_l=0.1126 l_i=0.0945 l_g=0.366  l_v=0.115 l_cov=3.123  l_vZ=0.144 l_vμ=0.315  log_s=[ 2.04,-2.12,-0.92,-0.42]  β=0.62 act_kl=0.01 μ|·|=0.170  coll=0.084 zp_coll=-0.008 sqrat=1.68  grad=15.37 mem=5.2GB  sec/step=0.65 eta=46.9min
+[step 850/5120]  loss=18.764  l_c=8.5  l_l=0.1068 l_i=0.7783 l_g=0.800  l_v=0.115 l_cov=3.734  l_vZ=0.154 l_vμ=0.342  log_s=[ 2.11,-2.19,-0.95,-0.41]  β=0.66 act_kl=0.00 μ|·|=0.056  coll=0.061 zp_coll=-0.002 sqrat=1.63  grad=15.26 mem=5.9GB  sec/step=0.70 eta=49.5min
+[step 900/5120]  loss=17.175  l_c=9.2  l_l=0.0811 l_i=0.2475 l_g=0.458  l_v=0.114 l_cov=5.341  l_vZ=0.151 l_vμ=0.298  log_s=[ 2.17,-2.25,-1.12,-0.48]  β=0.70 act_kl=0.09 μ|·|=0.217  coll=0.140 zp_coll=-0.033 sqrat=1.71  grad=26.31 mem=4.5GB  sec/step=0.68 eta=47.6min
+[step 950/5120]  loss=17.444  l_c=10.3 l_l=0.0890 l_i=0.2939 l_g=0.352  l_v=0.163 l_cov=2.818  l_vZ=0.163 l_vμ=0.315  log_s=[ 2.23,-2.30,-1.14,-0.53]  β=0.74 act_kl=0.31 μ|·|=0.272  coll=0.063 zp_coll=-0.029 sqrat=1.64  grad=11.07 mem=5.9GB  sec/step=0.66 eta=45.9min
+[step 1000/5120] loss=16.012  l_c=12.3 l_l=0.0970 l_i=0.0380 l_g=0.365  l_v=0.114 l_cov=3.255  l_vZ=0.181 l_vμ=0.329  log_s=[ 2.28,-2.33,-1.12,-0.54]  β=0.78 act_kl=0.58 μ|·|=0.313  coll=0.165 zp_coll= 0.007 sqrat=1.46  grad=11.16 mem=7.8GB  sec/step=0.69 eta=47.2min
+
+Epoch 0 done.  elapsed=11.6min
