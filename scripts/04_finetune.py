@@ -22,9 +22,12 @@ DEVICE          = "cuda" if torch.cuda.is_available() else "cpu"
 
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
+# `no_pretrain` is a sanity baseline: fresh distilroberta-base + fresh attention pool.
+# If GlocalIB cannot beat this, the pre-training added nothing.
 CONDITIONS = {
-    "glocal_ib": ("checkpoints/glocal_ib_epoch4.pt", "glocal"),
-    "h_mlm":     ("checkpoints/h_mlm_epoch3.pt",     "h_mlm"),
+    "glocal_ib":   ("checkpoints/glocal_ib_epoch4.pt", "glocal"),
+    "h_mlm":       ("checkpoints/h_mlm_epoch3.pt",     "h_mlm"),
+    "no_pretrain": (None,                              "raw"),
 }
 
 
@@ -39,10 +42,13 @@ def seed_everything(seed: int):
 def load_encoder(path, ckpt_type):
     """Returns (encoder, tokenizer, attn_pool) ready for DocumentClassifier."""
     if ckpt_type == "glocal":
+        # Load the full GlocalIB model and return the STUDENT pool — that's the
+        # one that actually trained via gradient. The teacher pool is an EMA of
+        # the student and barely diverges from random init over a short pre-train.
         m = GlocalIBModel(device=DEVICE)
         m.load_state_dict(torch.load(path, map_location=DEVICE))
-        return m.encoder, m.tokenizer, m.attn_pool_teacher
-    else:  # h_mlm
+        return m.encoder, m.tokenizer, m.attn_pool_student
+    elif ckpt_type == "h_mlm":
         ckpt      = torch.load(path, map_location=DEVICE)
         tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
         encoder   = RobertaModel.from_pretrained("distilroberta-base", add_pooling_layer=False)
@@ -50,6 +56,11 @@ def load_encoder(path, ckpt_type):
         encoder   = encoder.to(DEVICE)
         attn_pool = AttentionPooling(dim=768, max_chunks=50).to(DEVICE)
         attn_pool.load_state_dict(ckpt["attn_pool_state"])
+        return encoder, tokenizer, attn_pool
+    else:  # "raw" — no pre-training baseline
+        tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
+        encoder   = RobertaModel.from_pretrained("distilroberta-base", add_pooling_layer=False).to(DEVICE)
+        attn_pool = AttentionPooling(dim=768, max_chunks=50).to(DEVICE)
         return encoder, tokenizer, attn_pool
 
 
@@ -130,7 +141,7 @@ def main():
     all_results = {}
 
     for cond, (path, ckpt_type) in CONDITIONS.items():
-        if not os.path.exists(path):
+        if path is not None and not os.path.exists(path):
             print(f"Skipping {cond} — checkpoint not found at {path}")
             continue
 

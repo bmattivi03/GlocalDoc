@@ -15,6 +15,7 @@ from datetime import timedelta
 
 import torch
 import torch.distributed as dist
+import torch.nn.functional as F
 import wandb
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
@@ -36,15 +37,21 @@ from src.loss import glocal_ib_loss
 EPOCHS              = 5
 BATCH_SIZE          = 1       # per GPU; effective = BATCH_SIZE × num_GPUs × GRAD_ACCUM
 GRAD_ACCUM          = 8
-LR                  = 1e-5
-LR_LOG_S            = 1e-2    # ~1000× encoder LR — required for UW to actually converge
+LR                  = 3e-5    # bumped from 1e-5 — encoder needs to actually move
+LR_LOG_S            = 1e-2    # ~333× encoder LR — required for UW to actually converge
 MAX_GRAD_NORM       = 1.0
-EMA_TAU             = 0.99
+EMA_TAU             = 0.996   # DINO's value; slower, more stable teacher than 0.99
 BETA_KL_FINAL       = 1.0
 BETA_KL_WARMUP_FRAC = 0.25    # ramp β over first 25% of total optimizer steps
-FREE_BITS_NATS      = 0.5     # per-dim KL floor — prevents posterior collapse to N(0,1)
+FREE_BITS_NATS      = 0.05    # 0.05 × 256 = 12.8 nat floor (was 0.5 → 128 nat; too high)
+VAR_WEIGHT          = 1.0     # anti-collapse, fixed weight outside UW
+COV_WEIGHT          = 0.04    # VICReg default
+VAR_GAMMA           = 0.5     # per-dim std hinge threshold
 LOG_EVERY           = 1       # W&B log frequency (optimizer steps)
 PRINT_EVERY         = 50      # stdout summary frequency (optimizer steps)
+COLLAPSE_LOG_EVERY  = 50      # how often to compute inter-doc collapse metric
+COLLAPSE_ALARM_THR  = 0.95    # warn if rolling inter-doc cosine exceeds this
+Z_BUFFER_LEN        = 16      # rolling buffer of past Z_proj for collapse metric
 WANDB_PROJECT       = "glocal-nlp"
 CONDITION           = "glocal_ib"
 # ─────────────────────────────────────────────────────────────────────────────
@@ -57,6 +64,18 @@ def collate_fn(batch):
 def beta_kl_schedule(step: int, total_steps: int) -> float:
     warmup = max(1, int(total_steps * BETA_KL_WARMUP_FRAC))
     return BETA_KL_FINAL * min(1.0, step / warmup)
+
+
+def mean_pairwise_cosine(buf: deque) -> float:
+    """Average pairwise cosine over a deque of (D,) tensors. Returns 0.0 if too short."""
+    if len(buf) < 2:
+        return 0.0
+    z = torch.stack(list(buf))                  # (K, D), already fp32 cpu detached
+    z = F.normalize(z, dim=-1)
+    sims = z @ z.T                              # (K, K)
+    K = z.shape[0]
+    # off-diagonal mean
+    return ((sims.sum() - K) / (K * (K - 1))).item()
 
 
 def train():
@@ -89,6 +108,9 @@ def train():
             "beta_kl_final":        BETA_KL_FINAL,
             "beta_kl_warmup_frac":  BETA_KL_WARMUP_FRAC,
             "free_bits_nats":       FREE_BITS_NATS,
+            "var_weight":           VAR_WEIGHT,
+            "cov_weight":           COV_WEIGHT,
+            "var_gamma":            VAR_GAMMA,
         })
     # Block non-main ranks until main has created checkpoints/ — avoids a race
     # at the first accelerator.save_state() call.
@@ -104,8 +126,8 @@ def train():
     total_steps  = (len(loader) // GRAD_ACCUM) * EPOCHS
     warmup_steps = max(1, total_steps // 10)
 
-    # Two-group AdamW: log_s needs ~1000× the encoder LR to converge, and weight
-    # decay would pull it toward 0 — fighting its natural drift toward log(L_i).
+    # Two-group AdamW: log_s needs much higher LR to converge, and weight decay
+    # would pull it toward 0 — fighting its natural drift toward log(L_i).
     log_s_params = [p for n, p in model.named_parameters() if n == "log_s"]
     other_params = [p for n, p in model.named_parameters() if n != "log_s"]
     opt = AdamW([
@@ -117,13 +139,14 @@ def train():
     model, opt, loader, scheduler = accelerator.prepare(model, opt, loader, scheduler)
 
     # DDP only broadcasts trainable params at construction. The teacher attention
-    # pool has requires_grad=False (EMA-only), so its random init differs across
-    # ranks. Explicitly broadcast rank-0's teacher params so all ranks start
-    # from an identical teacher — otherwise step-0 L_local/L_global rep targets
-    # are rank-dependent until EMA converges. No-op on single GPU.
+    # pool AND the teacher encoder are requires_grad=False (EMA-only), so their
+    # init differs across ranks. Broadcast rank-0's teacher params so all ranks
+    # start from an identical teacher. No-op on single GPU.
     if accelerator.num_processes > 1:
         unwrapped = accelerator.unwrap_model(model)
         for p in unwrapped.attn_pool_teacher.parameters():
+            dist.broadcast(p.data, src=0)
+        for p in unwrapped.encoder_teacher.parameters():
             dist.broadcast(p.data, src=0)
         accelerator.wait_for_everyone()
 
@@ -137,6 +160,8 @@ def train():
 
     global_step    = 0
     step_times     = deque(maxlen=50)     # rolling sec/optimizer-step
+    z_proj_buffer  = deque(maxlen=Z_BUFFER_LEN)  # detached fp32 cpu Z_proj_pred for collapse metric
+    collapse_metric = 0.0
     t_train_start  = time.time()
 
     for epoch in range(EPOCHS):
@@ -153,7 +178,7 @@ def train():
             )
             loader_iter = pbar
 
-        opt_step_start = time.time()   # measures the full GRAD_ACCUM window per optimizer step
+        opt_step_start = time.time()
 
         for full_batch in loader_iter:
             # Build Xm: word/sentence mask each paragraph in each document
@@ -161,7 +186,6 @@ def train():
                 [mask_text(para) for para in doc]
                 for doc in full_batch
             ]
-            # Paragraph dropout indices (applied at pooling stage, not encoding)
             kept_indices_batch = [
                 get_paragraph_mask(len(doc))
                 for doc in full_batch
@@ -171,8 +195,14 @@ def train():
 
             with accelerator.accumulate(model):
                 out = model(full_batch, masked_batch, kept_indices_batch)
-                total, lc, ll, li, lg = glocal_ib_loss(
-                    *out, beta_kl=beta_kl, free_bits_nats=FREE_BITS_NATS,
+                # Loss consumes indices 0–7; indices 8–9 are for logging only.
+                total, lc, ll, li, lg, lvar, lcov = glocal_ib_loss(
+                    *out[:8],
+                    beta_kl=beta_kl,
+                    free_bits_nats=FREE_BITS_NATS,
+                    var_weight=VAR_WEIGHT,
+                    cov_weight=COV_WEIGHT,
+                    var_gamma=VAR_GAMMA,
                 )
                 accelerator.backward(total)
 
@@ -184,7 +214,7 @@ def train():
                 scheduler.step()
                 opt.zero_grad()
 
-                # EMA update after optimizer step — attention pooling only
+                # EMA update after optimizer step — encoder + attention pool
                 if accelerator.sync_gradients:
                     accelerator.unwrap_model(model).update_teacher_ema()
 
@@ -196,6 +226,9 @@ def train():
                 avg_step = sum(step_times) / len(step_times)
                 eta_sec  = avg_step * max(0, total_steps - global_step)
 
+                # Maintain rolling buffer of post-predictor Z_proj (already in out[1])
+                z_proj_buffer.append(out[1].detach().float().cpu().mean(0))
+
                 if accelerator.is_main_process:
                     log_s         = out[7].detach().float()
                     uw_weights    = torch.exp(-log_s)
@@ -205,6 +238,11 @@ def train():
                         1 + 2 * log_sigma_det - mu_det.pow(2) - torch.exp(2 * log_sigma_det)
                     )
                     active_kl_dims = (per_dim_kl > FREE_BITS_NATS).float().mean().item()
+                    predictor_norm_mean = out[1].detach().float().norm(dim=-1).mean().item()
+                    z_proj_norm_mean    = out[8].detach().float().norm(dim=-1).mean().item()
+
+                    if global_step % COLLAPSE_LOG_EVERY == 0:
+                        collapse_metric = mean_pairwise_cosine(z_proj_buffer)
 
                     if torch.cuda.is_available():
                         gpu_mem_gb = torch.cuda.max_memory_allocated() / 1e9
@@ -221,6 +259,8 @@ def train():
                             "l_local":             ll.item(),
                             "l_inter":             li.item(),
                             "l_global":            lg.item(),
+                            "l_variance":          lvar.item(),
+                            "l_covariance":        lcov.item(),
                             "uw_contrib_compress": (lc * uw_weights[0]).item(),
                             "uw_contrib_local":    (ll * uw_weights[1]).item(),
                             "uw_contrib_inter":    (li * uw_weights[2]).item(),
@@ -238,6 +278,9 @@ def train():
                             "log_sigma_mean":      log_sigma_det.mean().item(),
                             "kl_per_dim_mean":     per_dim_kl.mean().item(),
                             "active_kl_dims":      active_kl_dims,
+                            "predictor_norm_mean": predictor_norm_mean,
+                            "z_proj_norm_mean":    z_proj_norm_mean,
+                            "collapse_metric_inter_doc_cos": collapse_metric,
                             "grad_norm":           grad_norm_value,
                             "lr":                  scheduler.get_last_lr()[0],
                             "lr_log_s":            scheduler.get_last_lr()[1],
@@ -256,8 +299,9 @@ def train():
                             "loss": f"{total.item():.3f}",
                             "l_c":  f"{lc.item():.1f}",
                             "l_g":  f"{lg.item():.3f}",
+                            "l_v":  f"{lvar.item():.3f}",
                             "β":    f"{beta_kl:.2f}",
-                            "act":  f"{active_kl_dims:.2f}",
+                            "coll": f"{collapse_metric:.2f}",
                         })
 
                     if global_step % PRINT_EVERY == 0:
@@ -265,13 +309,24 @@ def train():
                             f"[step {global_step}/{total_steps}] "
                             f"loss={total.item():.3f}  "
                             f"l_c={lc.item():.1f} l_l={ll.item():.4f} "
-                            f"l_i={li.item():.4f} l_g={lg.item():.3f}  "
+                            f"l_i={li.item():.4f} l_g={lg.item():.3f} "
+                            f"l_v={lvar.item():.3f} l_cov={lcov.item():.3f}  "
                             f"log_s=[{log_s[0].item():.2f},{log_s[1].item():.2f},"
                             f"{log_s[2].item():.2f},{log_s[3].item():.2f}]  "
                             f"β={beta_kl:.2f} act_kl={active_kl_dims:.2f} "
-                            f"μ|·|={mu_det.abs().mean().item():.3f}  "
+                            f"μ|·|={mu_det.abs().mean().item():.3f} "
+                            f"coll={collapse_metric:.3f}  "
                             f"grad={grad_norm_value:.2f} mem={gpu_mem_gb:.1f}GB  "
                             f"sec/step={avg_step:.2f} eta={eta_sec/60:.1f}min",
+                            flush=True,
+                        )
+
+                    if collapse_metric > COLLAPSE_ALARM_THR and global_step % COLLAPSE_LOG_EVERY == 0:
+                        print(
+                            f"[ALARM] collapse_metric_inter_doc_cos={collapse_metric:.3f} "
+                            f"exceeds {COLLAPSE_ALARM_THR} at step {global_step}. "
+                            f"Anti-collapse may be insufficient — consider raising "
+                            f"VAR_WEIGHT or EMA_TAU.",
                             flush=True,
                         )
 

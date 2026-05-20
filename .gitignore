@@ -1,4 +1,5 @@
 checkpoints/*.pt
+checkpoints/*_epoch*/
 checkpoints/mlm/
 results/*.json
 results/*.png
@@ -10,4 +11,8 @@ __pycache__/
 notebooks/*_executed.ipynb
 .env
 wandb/
+.DS_Store
+# Local-only: a full mirror of the trained-machine repo uploaded for analysis.
+# Keep untracked so we never accidentally commit gigabytes of checkpoints.
+GlocalDoc_trained/
 
