@@ -82,6 +82,14 @@ class GlocalIBModel(nn.Module):
         # Homoscedastic UW weights: [compress, local, inter, global]
         self.log_s = nn.Parameter(torch.zeros(4))
 
+        # DINO-style centering of the teacher target. ECtHR docs share heavy
+        # boilerplate, so the raw EMA-teacher full-doc rep is near-constant
+        # across documents — making "predict the mean" the trivial collapsed
+        # solution for the BYOL predictor. Subtracting the running mean from
+        # Z_prime removes that fixed point. Updated under no_grad in forward().
+        self.register_buffer("teacher_center", torch.zeros(768))
+        self.center_momentum = 0.9
+
         self.ema_tau        = ema_tau
         self.max_paragraphs = max_paragraphs
         self.to(device)
@@ -170,7 +178,7 @@ class GlocalIBModel(nn.Module):
         Returns 10-tuple. Loss code consumes indices 0–7; indices 8–9 are for
         logging only (raw pre-predictor vectors to diagnose predictor health).
 
-          0  Z_prime         (B, 768)         teacher full-doc repr (EMA teacher, stop-grad)
+          0  Z_prime         (B, 768)         teacher full-doc repr, DINO-centered (EMA teacher, stop-grad)
           1  Z_proj_pred     (B, 768)         student post-IB, post-predictor (for L_global)
           2  z_partial_pred  (B, 768)         student partial-pool, post-predictor (for L_inter)
           3  s_chunks        list[(N, 768)]   student all-paragraph reps (for L_local, var, cov)
@@ -231,8 +239,22 @@ class GlocalIBModel(nn.Module):
 
         log_s = torch.clamp(self.log_s, min=-10, max=10)
 
+        # DINO-style center update + subtract. Z_prime has no gradient (produced
+        # under no_grad), so subtracting a buffer is safe. All-reduce makes ranks
+        # share a single center under DDP; no-op on single GPU.
+        Z_prime_batch = torch.stack(Z_prime_list)
+        with torch.no_grad():
+            batch_center = Z_prime_batch.mean(0).detach().float()
+            if torch.distributed.is_available() and torch.distributed.is_initialized():
+                torch.distributed.all_reduce(batch_center, op=torch.distributed.ReduceOp.SUM)
+                batch_center = batch_center / torch.distributed.get_world_size()
+            self.teacher_center.mul_(self.center_momentum).add_(
+                batch_center, alpha=1.0 - self.center_momentum
+            )
+        Z_prime_centered = Z_prime_batch - self.teacher_center.to(Z_prime_batch.dtype)
+
         return (
-            torch.stack(Z_prime_list),         # 0 (B, 768)
+            Z_prime_centered,                  # 0 (B, 768) DINO-centered teacher target
             torch.stack(Z_proj_pred_list),     # 1 (B, 768)
             torch.stack(z_partial_pred_list),  # 2 (B, 768)
             s_chunks_list,                     # 3 list[(N, 768)]

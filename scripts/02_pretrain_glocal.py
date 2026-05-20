@@ -43,9 +43,10 @@ MAX_GRAD_NORM       = 1.0
 EMA_TAU             = 0.996   # DINO's value; slower, more stable teacher than 0.99
 BETA_KL_FINAL       = 1.0
 BETA_KL_WARMUP_FRAC = 0.25    # ramp β over first 25% of total optimizer steps
-FREE_BITS_NATS      = 0.5     # 0.5 × 256 = 128 nat floor — FORCES mu to carry info (not noise).
-                              # Lower values (0.05) let mu collapse to 0 with sigma=1, making
-                              # z_sample = mu + sigma*ε ≈ pure noise → downstream learns constant.
+FREE_BITS_NATS      = 0.05    # 0.05 × 256 = 12.8 nat floor. Higher values (0.5) clamp
+                              # per-dim KL above the natural operating point — the clamp's
+                              # gradient is zero, so the encoder gets no signal to make mu
+                              # informative and posterior collapses (act_kl≈0, l_vμ≈hinge).
 VAR_WEIGHT          = 5.0     # encoder s_chunks anti-collapse
 COV_WEIGHT          = 0.04    # VICReg default
 VAR_GAMMA           = 0.5     # per-dim std hinge threshold (used for s_chunks AND temporal buffers)
@@ -62,6 +63,7 @@ LOG_EVERY           = 1       # W&B log frequency (optimizer steps)
 PRINT_EVERY         = 50      # stdout summary frequency (optimizer steps)
 COLLAPSE_LOG_EVERY  = 25      # how often to compute inter-doc collapse metric (was 50 — catch earlier)
 COLLAPSE_ALARM_THR  = 0.85    # warn if rolling inter-doc cosine exceeds this (was 0.95 — catch earlier)
+COLLAPSE_HARD_STOP_THR = 0.95 # exit cleanly when exceeded; the run is dead, stop burning compute
 Z_BUFFER_LEN        = 16      # rolling buffer of past Z_proj for collapse metric (cpu, diagnostic)
 WANDB_PROJECT       = "glocal-nlp"
 CONDITION           = "glocal_ib"
@@ -177,12 +179,15 @@ def train():
     global_step    = 0
     step_times     = deque(maxlen=50)     # rolling sec/optimizer-step
     z_proj_buffer  = deque(maxlen=Z_BUFFER_LEN)  # detached fp32 cpu Z_proj_pred for diagnostic collapse metric
+    z_prime_buffer = deque(maxlen=Z_BUFFER_LEN)  # detached fp32 cpu Z_prime_centered — distinguishes target vs predictor collapse
     # Temporal anti-collapse buffers (GPU, detached). Gradient flows through current
     # sample only; the queue contributes to the variance/cov computation but no
     # gradient flows back through it.
     z_proj_pred_loss_buf = deque(maxlen=TEMPORAL_BUF_LEN)   # each entry: (B, 768) on device
     mu_loss_buf          = deque(maxlen=TEMPORAL_BUF_LEN)   # each entry: (B, 256) on device
-    collapse_metric = 0.0
+    collapse_metric        = 0.0
+    z_prime_pairwise_cos   = 0.0
+    should_stop            = False
     t_train_start  = time.time()
 
     for epoch in range(EPOCHS):
@@ -282,6 +287,10 @@ def train():
 
                 # Maintain rolling buffer of post-predictor Z_proj (already in out[1])
                 z_proj_buffer.append(out[1].detach().float().cpu().mean(0))
+                # Maintain rolling buffer of DINO-centered teacher Z_prime — lets us
+                # distinguish target collapse (teacher stuck) from predictor collapse
+                # (teacher diverse but predictor squashes everything to the mean).
+                z_prime_buffer.append(out[0].detach().float().cpu().mean(0))
 
                 if accelerator.is_main_process:
                     log_s         = out[7].detach().float()
@@ -294,9 +303,15 @@ def train():
                     active_kl_dims = (per_dim_kl > FREE_BITS_NATS).float().mean().item()
                     predictor_norm_mean = out[1].detach().float().norm(dim=-1).mean().item()
                     z_proj_norm_mean    = out[8].detach().float().norm(dim=-1).mean().item()
+                    z_prime_norm_mean   = out[0].detach().float().norm(dim=-1).mean().item()
+                    # Predictor squash ratio: <1 means predictor reduces norm (suggests
+                    # it's pulling all outputs toward the same point). Normal range
+                    # ~0.8–1.2; persistently <0.5 with rising coll = predictor collapse.
+                    predictor_squash_ratio = predictor_norm_mean / max(z_proj_norm_mean, 1e-9)
 
                     if global_step % COLLAPSE_LOG_EVERY == 0:
-                        collapse_metric = mean_pairwise_cosine(z_proj_buffer)
+                        collapse_metric      = mean_pairwise_cosine(z_proj_buffer)
+                        z_prime_pairwise_cos = mean_pairwise_cosine(z_prime_buffer)
 
                     if torch.cuda.is_available():
                         gpu_mem_gb = torch.cuda.max_memory_allocated() / 1e9
@@ -338,7 +353,10 @@ def train():
                             "active_kl_dims":      active_kl_dims,
                             "predictor_norm_mean": predictor_norm_mean,
                             "z_proj_norm_mean":    z_proj_norm_mean,
+                            "z_prime_norm_mean":   z_prime_norm_mean,
+                            "predictor_squash_ratio": predictor_squash_ratio,
                             "collapse_metric_inter_doc_cos": collapse_metric,
+                            "z_prime_pairwise_cos": z_prime_pairwise_cos,
                             "grad_norm":           grad_norm_value,
                             "lr":                  scheduler.get_last_lr()[0],
                             "lr_log_s":            scheduler.get_last_lr()[1],
@@ -361,6 +379,7 @@ def train():
                             "l_vμ": f"{l_var_m.item():.3f}",
                             "β":    f"{beta_kl:.2f}",
                             "coll": f"{collapse_metric:.2f}",
+                            "zp_c": f"{z_prime_pairwise_cos:.2f}",
                         })
 
                     if global_step % PRINT_EVERY == 0:
@@ -375,7 +394,8 @@ def train():
                             f"{log_s[2].item():.2f},{log_s[3].item():.2f}]  "
                             f"β={beta_kl:.2f} act_kl={active_kl_dims:.2f} "
                             f"μ|·|={mu_det.abs().mean().item():.3f} "
-                            f"coll={collapse_metric:.3f}  "
+                            f"coll={collapse_metric:.3f} zp_coll={z_prime_pairwise_cos:.3f} "
+                            f"sqrat={predictor_squash_ratio:.2f}  "
                             f"grad={grad_norm_value:.2f} mem={gpu_mem_gb:.1f}GB  "
                             f"sec/step={avg_step:.2f} eta={eta_sec/60:.1f}min",
                             flush=True,
@@ -390,8 +410,36 @@ def train():
                             flush=True,
                         )
 
+                    if collapse_metric > COLLAPSE_HARD_STOP_THR and global_step % COLLAPSE_LOG_EVERY == 0:
+                        print(
+                            f"[HARD STOP] collapse_metric_inter_doc_cos={collapse_metric:.3f} "
+                            f"exceeds {COLLAPSE_HARD_STOP_THR} at step {global_step}. "
+                            f"Run is dead — terminating cleanly to save compute.",
+                            flush=True,
+                        )
+                        should_stop = True
+
+                # Propagate the stop signal from rank-0 to all ranks (no-op on single GPU).
+                if accelerator.num_processes > 1:
+                    stop_t = torch.tensor(
+                        [1.0 if should_stop else 0.0], device=device
+                    )
+                    dist.all_reduce(stop_t, op=dist.ReduceOp.MAX)
+                    should_stop = stop_t.item() > 0.5
+
+                if should_stop:
+                    break
+
         if pbar is not None:
             pbar.close()
+
+        if should_stop:
+            if accelerator.is_main_process:
+                print(
+                    f"[HARD STOP] Skipping epoch {epoch} checkpoint save — model collapsed.",
+                    flush=True,
+                )
+            break
 
         accelerator.wait_for_everyone()
         # save_state is collective — must be called on all ranks
