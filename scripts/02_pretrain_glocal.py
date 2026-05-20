@@ -31,7 +31,7 @@ transformers.logging.set_verbosity_error()
 sys.path.append(".")
 from src.data import load_ecthr, mask_text, get_paragraph_mask
 from src.model import GlocalIBModel
-from src.loss import glocal_ib_loss
+from src.loss import glocal_ib_loss, variance_loss, covariance_loss
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 EPOCHS              = 5
@@ -44,14 +44,23 @@ EMA_TAU             = 0.996   # DINO's value; slower, more stable teacher than 0
 BETA_KL_FINAL       = 1.0
 BETA_KL_WARMUP_FRAC = 0.25    # ramp β over first 25% of total optimizer steps
 FREE_BITS_NATS      = 0.05    # 0.05 × 256 = 12.8 nat floor (was 0.5 → 128 nat; too high)
-VAR_WEIGHT          = 1.0     # anti-collapse, fixed weight outside UW
+VAR_WEIGHT          = 5.0     # encoder s_chunks anti-collapse (bumped from 1.0 after collapse observed downstream)
 COV_WEIGHT          = 0.04    # VICReg default
-VAR_GAMMA           = 0.5     # per-dim std hinge threshold
+VAR_GAMMA           = 0.5     # per-dim std hinge threshold (used for s_chunks AND temporal buffers)
+# Temporal anti-collapse on Z_proj_pred and mu (rolling GPU buffers, gradient flows
+# through current sample only). Addresses the downstream collapse mode where the
+# IB+projector+predictor chain maps varied encoder outputs to constant final reps.
+Z_PROJ_VAR_WEIGHT   = 10.0    # temporal variance on Z_proj_pred
+Z_PROJ_COV_WEIGHT   = 1.0     # temporal covariance on Z_proj_pred
+MU_VAR_WEIGHT       = 5.0     # temporal variance on mu (forces bottleneck informativity)
+MU_COV_WEIGHT       = 0.5     # temporal covariance on mu
+TEMPORAL_BUF_LEN    = 16      # how many past samples to keep in GPU buffer
+TEMPORAL_MIN_FILL   = 4       # min buffer fill before temporal loss activates
 LOG_EVERY           = 1       # W&B log frequency (optimizer steps)
 PRINT_EVERY         = 50      # stdout summary frequency (optimizer steps)
 COLLAPSE_LOG_EVERY  = 50      # how often to compute inter-doc collapse metric
 COLLAPSE_ALARM_THR  = 0.95    # warn if rolling inter-doc cosine exceeds this
-Z_BUFFER_LEN        = 16      # rolling buffer of past Z_proj for collapse metric
+Z_BUFFER_LEN        = 16      # rolling buffer of past Z_proj for collapse metric (cpu, diagnostic)
 WANDB_PROJECT       = "glocal-nlp"
 CONDITION           = "glocal_ib"
 # ─────────────────────────────────────────────────────────────────────────────
@@ -111,6 +120,11 @@ def train():
             "var_weight":           VAR_WEIGHT,
             "cov_weight":           COV_WEIGHT,
             "var_gamma":            VAR_GAMMA,
+            "z_proj_var_weight":    Z_PROJ_VAR_WEIGHT,
+            "z_proj_cov_weight":    Z_PROJ_COV_WEIGHT,
+            "mu_var_weight":        MU_VAR_WEIGHT,
+            "mu_cov_weight":        MU_COV_WEIGHT,
+            "temporal_buf_len":     TEMPORAL_BUF_LEN,
         })
     # Block non-main ranks until main has created checkpoints/ — avoids a race
     # at the first accelerator.save_state() call.
@@ -160,7 +174,12 @@ def train():
 
     global_step    = 0
     step_times     = deque(maxlen=50)     # rolling sec/optimizer-step
-    z_proj_buffer  = deque(maxlen=Z_BUFFER_LEN)  # detached fp32 cpu Z_proj_pred for collapse metric
+    z_proj_buffer  = deque(maxlen=Z_BUFFER_LEN)  # detached fp32 cpu Z_proj_pred for diagnostic collapse metric
+    # Temporal anti-collapse buffers (GPU, detached). Gradient flows through current
+    # sample only; the queue contributes to the variance/cov computation but no
+    # gradient flows back through it.
+    z_proj_pred_loss_buf = deque(maxlen=TEMPORAL_BUF_LEN)   # each entry: (B, 768) on device
+    mu_loss_buf          = deque(maxlen=TEMPORAL_BUF_LEN)   # each entry: (B, 256) on device
     collapse_metric = 0.0
     t_train_start  = time.time()
 
@@ -204,7 +223,40 @@ def train():
                     cov_weight=COV_WEIGHT,
                     var_gamma=VAR_GAMMA,
                 )
+
+                # Temporal anti-collapse on Z_proj_pred (out[1]) and mu (out[5]).
+                # Concatenate the current with-gradient sample with detached past
+                # samples; variance/cov gradient flows through current sample only,
+                # pushing it AWAY from the queue mean / decorrelating its dims.
+                # This addresses the failure mode where the IB+projector+predictor
+                # chain maps varied encoder outputs to constant final reps.
+                l_var_z = out[1].new_zeros(())
+                l_cov_z = out[1].new_zeros(())
+                l_var_m = out[5].new_zeros(())
+                l_cov_m = out[5].new_zeros(())
+                if len(z_proj_pred_loss_buf) >= TEMPORAL_MIN_FILL:
+                    queue_z = torch.cat(list(z_proj_pred_loss_buf), dim=0)   # (K, 768)
+                    z_all   = torch.cat([out[1], queue_z], dim=0)
+                    l_var_z = variance_loss(z_all, gamma=VAR_GAMMA)
+                    l_cov_z = covariance_loss(z_all)
+
+                    queue_m = torch.cat(list(mu_loss_buf), dim=0)            # (K, 256)
+                    mu_all  = torch.cat([out[5], queue_m], dim=0)
+                    l_var_m = variance_loss(mu_all, gamma=VAR_GAMMA)
+                    l_cov_m = covariance_loss(mu_all)
+
+                total = total \
+                      + Z_PROJ_VAR_WEIGHT * l_var_z \
+                      + Z_PROJ_COV_WEIGHT * l_cov_z \
+                      + MU_VAR_WEIGHT     * l_var_m \
+                      + MU_COV_WEIGHT     * l_cov_m
+
                 accelerator.backward(total)
+
+                # Push current detached samples to the temporal buffers AFTER
+                # backward (so the next step sees them). Use bf16 to save memory.
+                z_proj_pred_loss_buf.append(out[1].detach().to(torch.bfloat16))
+                mu_loss_buf.append(out[5].detach().to(torch.bfloat16))
 
                 grad_norm = None
                 if accelerator.sync_gradients:
@@ -261,6 +313,10 @@ def train():
                             "l_global":            lg.item(),
                             "l_variance":          lvar.item(),
                             "l_covariance":        lcov.item(),
+                            "l_var_z_temporal":    l_var_z.item(),
+                            "l_cov_z_temporal":    l_cov_z.item(),
+                            "l_var_mu_temporal":   l_var_m.item(),
+                            "l_cov_mu_temporal":   l_cov_m.item(),
                             "uw_contrib_compress": (lc * uw_weights[0]).item(),
                             "uw_contrib_local":    (ll * uw_weights[1]).item(),
                             "uw_contrib_inter":    (li * uw_weights[2]).item(),
@@ -299,7 +355,8 @@ def train():
                             "loss": f"{total.item():.3f}",
                             "l_c":  f"{lc.item():.1f}",
                             "l_g":  f"{lg.item():.3f}",
-                            "l_v":  f"{lvar.item():.3f}",
+                            "l_vZ": f"{l_var_z.item():.3f}",
+                            "l_vμ": f"{l_var_m.item():.3f}",
                             "β":    f"{beta_kl:.2f}",
                             "coll": f"{collapse_metric:.2f}",
                         })
@@ -310,7 +367,8 @@ def train():
                             f"loss={total.item():.3f}  "
                             f"l_c={lc.item():.1f} l_l={ll.item():.4f} "
                             f"l_i={li.item():.4f} l_g={lg.item():.3f} "
-                            f"l_v={lvar.item():.3f} l_cov={lcov.item():.3f}  "
+                            f"l_v={lvar.item():.3f} l_cov={lcov.item():.3f} "
+                            f"l_vZ={l_var_z.item():.3f} l_vμ={l_var_m.item():.3f}  "
                             f"log_s=[{log_s[0].item():.2f},{log_s[1].item():.2f},"
                             f"{log_s[2].item():.2f},{log_s[3].item():.2f}]  "
                             f"β={beta_kl:.2f} act_kl={active_kl_dims:.2f} "
