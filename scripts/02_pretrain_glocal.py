@@ -43,23 +43,25 @@ MAX_GRAD_NORM       = 1.0
 EMA_TAU             = 0.996   # DINO's value; slower, more stable teacher than 0.99
 BETA_KL_FINAL       = 1.0
 BETA_KL_WARMUP_FRAC = 0.25    # ramp β over first 25% of total optimizer steps
-FREE_BITS_NATS      = 0.05    # 0.05 × 256 = 12.8 nat floor (was 0.5 → 128 nat; too high)
-VAR_WEIGHT          = 5.0     # encoder s_chunks anti-collapse (bumped from 1.0 after collapse observed downstream)
+FREE_BITS_NATS      = 0.5     # 0.5 × 256 = 128 nat floor — FORCES mu to carry info (not noise).
+                              # Lower values (0.05) let mu collapse to 0 with sigma=1, making
+                              # z_sample = mu + sigma*ε ≈ pure noise → downstream learns constant.
+VAR_WEIGHT          = 5.0     # encoder s_chunks anti-collapse
 COV_WEIGHT          = 0.04    # VICReg default
 VAR_GAMMA           = 0.5     # per-dim std hinge threshold (used for s_chunks AND temporal buffers)
 # Temporal anti-collapse on Z_proj_pred and mu (rolling GPU buffers, gradient flows
 # through current sample only). Addresses the downstream collapse mode where the
 # IB+projector+predictor chain maps varied encoder outputs to constant final reps.
-Z_PROJ_VAR_WEIGHT   = 10.0    # temporal variance on Z_proj_pred
+Z_PROJ_VAR_WEIGHT   = 25.0    # temporal variance on Z_proj_pred (VICReg paper's variance weight)
 Z_PROJ_COV_WEIGHT   = 1.0     # temporal covariance on Z_proj_pred
-MU_VAR_WEIGHT       = 5.0     # temporal variance on mu (forces bottleneck informativity)
-MU_COV_WEIGHT       = 0.5     # temporal covariance on mu
+MU_VAR_WEIGHT       = 25.0    # temporal variance on mu (high — bottleneck must remain informative)
+MU_COV_WEIGHT       = 1.0     # temporal covariance on mu
 TEMPORAL_BUF_LEN    = 16      # how many past samples to keep in GPU buffer
 TEMPORAL_MIN_FILL   = 4       # min buffer fill before temporal loss activates
 LOG_EVERY           = 1       # W&B log frequency (optimizer steps)
 PRINT_EVERY         = 50      # stdout summary frequency (optimizer steps)
-COLLAPSE_LOG_EVERY  = 50      # how often to compute inter-doc collapse metric
-COLLAPSE_ALARM_THR  = 0.95    # warn if rolling inter-doc cosine exceeds this
+COLLAPSE_LOG_EVERY  = 25      # how often to compute inter-doc collapse metric (was 50 — catch earlier)
+COLLAPSE_ALARM_THR  = 0.85    # warn if rolling inter-doc cosine exceeds this (was 0.95 — catch earlier)
 Z_BUFFER_LEN        = 16      # rolling buffer of past Z_proj for collapse metric (cpu, diagnostic)
 WANDB_PROJECT       = "glocal-nlp"
 CONDITION           = "glocal_ib"
