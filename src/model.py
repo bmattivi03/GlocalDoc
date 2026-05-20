@@ -1,4 +1,5 @@
 import contextlib
+import copy
 import torch
 import torch.nn as nn
 from transformers import RobertaModel, RobertaTokenizerFast
@@ -29,31 +30,29 @@ class GlocalIBModel(nn.Module):
         hidden_dim: int     = 256,
         proj_dim: int       = 512,
         max_paragraphs: int = 50,
-        ema_tau: float      = 0.99,
+        ema_tau: float      = 0.996,
         device: str         = "cuda",
     ):
         super().__init__()
         self.tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
-        # Single shared encoder. Teacher pass uses stop-grad; student pass trains it.
+        # Student encoder — receives gradient.
         self.encoder   = RobertaModel.from_pretrained("distilroberta-base")
-        # Gradient checkpointing intentionally OFF: the encoder is called twice
-        # per forward (teacher under no_grad, then student with grad) on the SAME
-        # module. Under fp16, both use_reentrant=True and use_reentrant=False paths
-        # corrupt the checkpoint frame's saved-tensor list across the two calls,
-        # producing `CheckpointError: Recomputed values have different metadata`
-        # at the first backward. With distilroberta-base (~82M params) and
-        # BATCH_SIZE=1, activations fit comfortably in 12GB; checkpointing isn't
-        # needed. Only re-enable if you raise BATCH_SIZE and hit OOM.
         self.encoder.config.use_cache = False
+
+        # BYOL-style EMA teacher encoder (separate deepcopy). The teacher provides
+        # alignment targets that are stable across student updates, removing the
+        # trivial collapse fixed point where a single shared encoder could satisfy
+        # all alignment losses by becoming input-invariant. Updated by EMA only,
+        # never by gradient.
+        self.encoder_teacher = copy.deepcopy(self.encoder)
+        for p in self.encoder_teacher.parameters():
+            p.requires_grad = False
+        self.encoder_teacher.eval()
 
         # Separate attention pools: student trains via gradient, teacher updated via EMA.
         self.attn_pool_student = AttentionPooling(dim=768, max_chunks=max_paragraphs)
         self.attn_pool_teacher = AttentionPooling(dim=768, max_chunks=max_paragraphs)
-        # Initialize teacher from student so EMA starts from an identical state on
-        # every rank (otherwise each DDP rank's teacher diverges at step 0 since
-        # the teacher is not gradient-synced).
         self.attn_pool_teacher.load_state_dict(self.attn_pool_student.state_dict())
-        # Teacher attention is never updated by gradient — EMA only.
         for p in self.attn_pool_teacher.parameters():
             p.requires_grad = False
 
@@ -68,6 +67,18 @@ class GlocalIBModel(nn.Module):
             nn.Linear(proj_dim, 768),
         )
 
+        # BYOL/SimSiam predictor — applied on the STUDENT side only, to both the
+        # IB-projected vector (before L_global) and the partial-pool vector
+        # (before L_inter). This asymmetry is the formal mechanism that prevents
+        # representation collapse in non-contrastive self-distillation.
+        # LayerNorm (not BatchNorm) because batch_size=1.
+        self.predictor = nn.Sequential(
+            nn.Linear(768, 512),
+            nn.LayerNorm(512),
+            nn.GELU(),
+            nn.Linear(512, 768),
+        )
+
         # Homoscedastic UW weights: [compress, local, inter, global]
         self.log_s = nn.Parameter(torch.zeros(4))
 
@@ -79,21 +90,21 @@ class GlocalIBModel(nn.Module):
     # Internal paragraph encoding
     # ------------------------------------------------------------------
 
-    def _encode_paragraphs(self, paragraphs: list, stop_grad: bool) -> torch.Tensor:
+    def _encode_paragraphs(self, paragraphs: list, use_teacher: bool) -> torch.Tensor:
         """
         Encode a list of paragraph strings → (N, 768).
 
-        Paragraphs longer than 510 tokens are split into non-overlapping sub-chunks
-        of 510 tokens, each encoded via CLS, then mean-pooled into one vector.
-        All sub-chunks across all paragraphs are batched into a single encoder
-        forward pass, so peak VRAM = one pass regardless of paragraph count.
+        Paragraphs longer than 510 tokens are split into non-overlapping sub-chunks,
+        each encoded via CLS, then mean-pooled into one vector. All sub-chunks
+        across all paragraphs are batched into a single encoder forward pass.
 
-        Teacher calls use stop_grad=True (torch.no_grad) so no activations are
-        retained for backprop, keeping peak VRAM to one student-pass equivalent.
+        `use_teacher=True` uses the frozen EMA teacher encoder under torch.no_grad;
+        no activations are retained. `use_teacher=False` uses the student encoder
+        with gradient.
         """
-        CHUNK_SIZE  = 510   # leave room for [CLS] and [SEP]
-        sub_chunks: list    = []
-        boundaries: list    = []   # (start, end) index into sub_chunks per paragraph
+        CHUNK_SIZE  = 510
+        sub_chunks: list = []
+        boundaries: list = []
 
         for para in paragraphs:
             ids   = self.tokenizer.encode(para, add_special_tokens=False)
@@ -105,28 +116,45 @@ class GlocalIBModel(nn.Module):
                     sub_chunks.append(self.tokenizer.decode(ids[i:i + CHUNK_SIZE]))
             boundaries.append((start, len(sub_chunks)))
 
+        enc_module = self.encoder_teacher if use_teacher else self.encoder
         enc = self.tokenizer(
             sub_chunks, padding=True, truncation=True,
             max_length=512, return_tensors="pt",
-        ).to(self.encoder.device)
+        ).to(enc_module.device)
 
-        ctx = torch.no_grad() if stop_grad else contextlib.nullcontext()
+        ctx = torch.no_grad() if use_teacher else contextlib.nullcontext()
         with ctx:
-            cls_vecs = self.encoder(**enc).last_hidden_state[:, 0, :]  # (total_chunks, 768)
+            cls_vecs = enc_module(**enc).last_hidden_state[:, 0, :]
 
-        return torch.stack([cls_vecs[s:e].mean(0) for s, e in boundaries])  # (N, 768)
+        return torch.stack([cls_vecs[s:e].mean(0) for s, e in boundaries])
 
     # ------------------------------------------------------------------
     # EMA update (call after every optimizer.step)
     # ------------------------------------------------------------------
 
     def update_teacher_ema(self):
+        """EMA-update both the teacher encoder and the teacher attention pool.
+        Buffers (LayerNorm running stats, etc.) are hard-copied from student
+        each call to keep them synced — EMA on buffers tends to drift."""
         with torch.no_grad():
+            # Encoder parameters
+            for p_t, p_s in zip(
+                self.encoder_teacher.parameters(),
+                self.encoder.parameters(),
+            ):
+                p_t.data.mul_(self.ema_tau).add_(p_s.data, alpha=1.0 - self.ema_tau)
+            # Encoder buffers (LayerNorm running mean/var if any) — direct copy
+            for b_t, b_s in zip(
+                self.encoder_teacher.buffers(),
+                self.encoder.buffers(),
+            ):
+                b_t.data.copy_(b_s.data)
+            # Attention pool
             for p_t, p_s in zip(
                 self.attn_pool_teacher.parameters(),
                 self.attn_pool_student.parameters(),
             ):
-                p_t.data = self.ema_tau * p_t.data + (1 - self.ema_tau) * p_s.data
+                p_t.data.mul_(self.ema_tau).add_(p_s.data, alpha=1.0 - self.ema_tau)
 
     # ------------------------------------------------------------------
     # Forward pass
@@ -139,34 +167,40 @@ class GlocalIBModel(nn.Module):
         kept_indices_batch: list,   # list[list[int]] — M kept indices per doc
     ):
         """
-        Returns 8-tuple:
-          Z_prime    (B, 768)        teacher full-doc repr (stop-grad)
-          Z_proj     (B, 768)        student post-IB projection
-          z_partial  (B, 768)        student pre-IB partial-doc repr (for L_inter)
-          s_chunks   list[(N, 768)] student all-paragraph reps (for L_local)
-          t_chunks   list[(N, 768)] teacher all-paragraph reps (for L_local)
-          mu         (B, 256)        IB mean
-          log_sigma  (B, 256)        IB log-std (clamped to [-10, 10])
-          log_s      (4,)            UW weights (clamped to [-10, 10])
+        Returns 10-tuple. Loss code consumes indices 0–7; indices 8–9 are for
+        logging only (raw pre-predictor vectors to diagnose predictor health).
+
+          0  Z_prime         (B, 768)         teacher full-doc repr (EMA teacher, stop-grad)
+          1  Z_proj_pred     (B, 768)         student post-IB, post-predictor (for L_global)
+          2  z_partial_pred  (B, 768)         student partial-pool, post-predictor (for L_inter)
+          3  s_chunks        list[(N, 768)]   student all-paragraph reps (for L_local, var, cov)
+          4  t_chunks        list[(N, 768)]   teacher all-paragraph reps (for L_local)
+          5  mu              (B, 256)         IB mean
+          6  log_sigma       (B, 256)         IB log-std (clamped to [-10, 10])
+          7  log_s           (4,)             UW weights (clamped to [-10, 10])
+          8  Z_proj          (B, 768)         student post-IB pre-predictor (logging only)
+          9  z_partial       (B, 768)         student pre-IB pre-predictor (logging only)
         """
-        Z_prime_list   = []
-        Z_proj_list    = []
-        z_partial_list = []
-        s_chunks_list  = []
-        t_chunks_list  = []
-        mu_list        = []
-        log_sigma_list = []
+        Z_prime_list        = []
+        Z_proj_pred_list    = []
+        z_partial_pred_list = []
+        Z_proj_list         = []
+        z_partial_list      = []
+        s_chunks_list       = []
+        t_chunks_list       = []
+        mu_list             = []
+        log_sigma_list      = []
 
         for full, masked, kept in zip(full_batch, masked_batch, kept_indices_batch):
-            # ── Teacher: stop-grad encoder pass, then teacher attention pool ──
-            t_chunks = self._encode_paragraphs(full, stop_grad=True)       # (N, 768)
+            # ── Teacher: EMA encoder pass under no_grad, then EMA attention pool
+            t_chunks = self._encode_paragraphs(full, use_teacher=True)     # (N, 768)
             with torch.no_grad():
                 Z_prime = self.attn_pool_teacher(t_chunks)                 # (768,)
 
-            # ── Student: full grad encoder pass ──────────────────────────────
-            s_chunks = self._encode_paragraphs(masked, stop_grad=False)    # (N, 768)
+            # ── Student: trainable encoder pass
+            s_chunks = self._encode_paragraphs(masked, use_teacher=False)  # (N, 768)
 
-            # Paragraph dropout: keep M reps for student pooling
+            # Paragraph dropout for the partial-pool view
             valid_kept = [i for i in kept if i < len(s_chunks)]
             if not valid_kept:
                 valid_kept = [0]
@@ -175,12 +209,19 @@ class GlocalIBModel(nn.Module):
 
             # IB bottleneck — clamp log_sigma to prevent over/underflow under bf16.
             mu        = self.mu_head(z_partial)                            # (256,)
-            log_sigma = torch.clamp(self.log_sigma_head(z_partial), -10, 10)  # (256,)
+            log_sigma = torch.clamp(self.log_sigma_head(z_partial), -10, 10)
             sigma     = torch.exp(log_sigma)
             z_sample  = mu + sigma * torch.randn_like(mu)
             Z_proj    = self.projector(z_sample)                          # (768,)
 
+            # Predictor: applied on student side only — the asymmetry that
+            # breaks the trivial collapse fixed point.
+            Z_proj_pred    = self.predictor(Z_proj)
+            z_partial_pred = self.predictor(z_partial)
+
             Z_prime_list.append(Z_prime)
+            Z_proj_pred_list.append(Z_proj_pred)
+            z_partial_pred_list.append(z_partial_pred)
             Z_proj_list.append(Z_proj)
             z_partial_list.append(z_partial)
             s_chunks_list.append(s_chunks)
@@ -191,37 +232,35 @@ class GlocalIBModel(nn.Module):
         log_s = torch.clamp(self.log_s, min=-10, max=10)
 
         return (
-            torch.stack(Z_prime_list),    # (B, 768)
-            torch.stack(Z_proj_list),     # (B, 768)
-            torch.stack(z_partial_list),  # (B, 768)
-            s_chunks_list,                # list[Tensor(N, 768)]
-            t_chunks_list,                # list[Tensor(N, 768)]
-            torch.stack(mu_list),         # (B, 256)
-            torch.stack(log_sigma_list),  # (B, 256)
-            log_s,                        # (4,)
+            torch.stack(Z_prime_list),         # 0 (B, 768)
+            torch.stack(Z_proj_pred_list),     # 1 (B, 768)
+            torch.stack(z_partial_pred_list),  # 2 (B, 768)
+            s_chunks_list,                     # 3 list[(N, 768)]
+            t_chunks_list,                     # 4 list[(N, 768)]
+            torch.stack(mu_list),              # 5 (B, 256)
+            torch.stack(log_sigma_list),       # 6 (B, 256)
+            log_s,                             # 7 (4,)
+            torch.stack(Z_proj_list),          # 8 (B, 768)  logging only
+            torch.stack(z_partial_list),       # 9 (B, 768)  logging only
         )
 
 
 class DocumentClassifier(nn.Module):
     """
-    Fine-tuning classifier. Loads encoder and teacher attention pool from a
-    pre-trained GlocalIBModel checkpoint.
+    Fine-tuning classifier. Loads encoder and attention pool from a pre-trained
+    checkpoint.
 
-    Usage:
-        pretrained = GlocalIBModel(...)
-        # load state dict ...
-        classifier = DocumentClassifier(
-            encoder=pretrained.encoder,
-            tokenizer=pretrained.tokenizer,
-            attn_pool=pretrained.attn_pool_teacher,
-        )
+    For GlocalIB: pass `m.attn_pool_student` (the pool that actually trained
+    via gradient — `attn_pool_teacher` is an EMA of the student and barely
+    diverges from random init over a single short pre-training run).
+    For H-MLM: pass the trained `attn_pool`.
     """
 
     def __init__(
         self,
         encoder,
         tokenizer,
-        attn_pool,                      # pass pretrained.attn_pool_teacher
+        attn_pool,
         num_labels: int     = 10,
         max_paragraphs: int = 50,
         device: str         = "cuda",

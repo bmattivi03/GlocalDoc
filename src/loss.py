@@ -25,39 +25,77 @@ def compression_loss(
     return per_dim_kl.sum(-1).mean()
 
 
+def variance_loss(z: torch.Tensor, gamma: float = 0.5, eps: float = 1e-4) -> torch.Tensor:
+    """VICReg-style variance hinge. Encourages per-dim std(z over N) ≥ gamma.
+
+    Below gamma, gradient pulls the encoder away from collapse. Above gamma,
+    the loss is zero (no spurious pressure on already-diverse features).
+    z: (N, D) where N ≥ 2 (e.g., paragraph reps within a document).
+    """
+    if z.shape[0] < 2:
+        return z.new_zeros(())
+    std = torch.sqrt(z.var(dim=0, unbiased=True) + eps)
+    return F.relu(gamma - std).mean()
+
+
+def covariance_loss(z: torch.Tensor) -> torch.Tensor:
+    """VICReg-style covariance regularizer. Pushes off-diagonal of cov(z) toward 0,
+    decorrelating feature dimensions and preventing dimensional collapse.
+    z: (N, D) where N ≥ 2.
+    """
+    if z.shape[0] < 2:
+        return z.new_zeros(())
+    z_centered = z - z.mean(dim=0, keepdim=True)
+    n = z.shape[0]
+    cov = (z_centered.T @ z_centered) / max(n - 1, 1)
+    off_diag = cov - torch.diag(torch.diagonal(cov))
+    return off_diag.pow(2).sum() / z.shape[1]
+
+
 def glocal_ib_loss(
     Z_prime:   torch.Tensor,   # (B, 768) teacher full-doc
-    Z_proj:    torch.Tensor,   # (B, 768) student post-IB
-    z_partial: torch.Tensor,   # (B, 768) student pre-IB (for L_inter)
-    s_chunks:  list,           # list[Tensor(N, 768)] student all-para reps
+    Z_proj:    torch.Tensor,   # (B, 768) student post-IB post-predictor
+    z_partial: torch.Tensor,   # (B, 768) student pre-IB partial-pool post-predictor (for L_inter)
+    s_chunks:  list,           # list[Tensor(N, 768)] student all-para reps (pre-pool, pre-predictor)
     t_chunks:  list,           # list[Tensor(N, 768)] teacher all-para reps
     mu:        torch.Tensor,   # (B, 256)
     log_sigma: torch.Tensor,   # (B, 256) clamped log-σ
     log_s:     torch.Tensor,   # (4,) clamped UW weights [compress, local, inter, global]
     beta_kl: float = 1.0,
-    free_bits_nats: float = 0.5,
+    free_bits_nats: float = 0.05,
+    var_weight: float = 1.0,
+    cov_weight: float = 0.04,
+    var_gamma: float = 0.5,
 ):
     """
-    Four-component hierarchical GlocalIB loss with homoscedastic uncertainty weighting.
+    Four-component hierarchical GlocalIB loss with homoscedastic uncertainty weighting,
+    plus anti-collapse variance + covariance regularizers on raw student paragraph reps.
 
-    L_compress  β · KL penalty (with free bits) — forces IB bottleneck to compress
-    L_local     align all N paragraph pairs (teacher_i vs student_i)
-    L_inter     align student partial pool vs teacher full doc (pre-IB gradient path)
-    L_global    align student IB projection vs teacher full doc (post-IB)
+    L_compress   β · KL penalty (with free bits) — forces IB bottleneck to compress
+    L_local      align all N paragraph pairs (teacher_i vs student_i)
+    L_inter      align student partial-pool (predictor) vs teacher full doc (pre-IB)
+    L_global     align student IB projection (predictor) vs teacher full doc (post-IB)
+    L_variance   VICReg variance hinge on per-doc paragraph reps (fixed weight, outside UW)
+    L_covariance VICReg covariance regularizer on per-doc paragraph reps (fixed weight, outside UW)
 
-    beta_kl scales the raw compression loss before it enters the UW stack; UW
-    (exp(−log_s_compress)) adapts to whatever scale β·KL settles at. Ramping β
-    from 0 prevents the large init KL from crushing μ before alignment losses
-    can shape the bottleneck.
+    UW only weights the four original losses. Variance and covariance use fixed weights —
+    an anti-collapse signal must never be down-weightable by UW.
 
-    Returns (total, l_compress, l_local, l_inter, l_global).
+    Returns (total, l_compress, l_local, l_inter, l_global, l_variance, l_covariance).
     """
     l_compress = beta_kl * compression_loss(mu, log_sigma, free_bits_nats=free_bits_nats)
     l_local    = alignment_loss(torch.cat(s_chunks), torch.cat(t_chunks))
     l_inter    = alignment_loss(z_partial, Z_prime.detach())
     l_global   = alignment_loss(Z_proj,    Z_prime.detach())
 
-    losses = torch.stack([l_compress, l_local, l_inter, l_global])
-    total  = (losses * torch.exp(-log_s) + log_s).sum()
+    var_terms = [variance_loss(sc, gamma=var_gamma)  for sc in s_chunks]
+    cov_terms = [covariance_loss(sc)                  for sc in s_chunks]
+    l_variance   = torch.stack(var_terms).mean() if var_terms else Z_proj.new_zeros(())
+    l_covariance = torch.stack(cov_terms).mean() if cov_terms else Z_proj.new_zeros(())
 
-    return total, l_compress, l_local, l_inter, l_global
+    losses_uw = torch.stack([l_compress, l_local, l_inter, l_global])
+    total = (losses_uw * torch.exp(-log_s) + log_s).sum() \
+          + var_weight * l_variance \
+          + cov_weight * l_covariance
+
+    return total, l_compress, l_local, l_inter, l_global, l_variance, l_covariance
