@@ -23,7 +23,7 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 import transformers
-from transformers import get_linear_schedule_with_warmup
+from transformers import get_cosine_schedule_with_warmup
 from accelerate import Accelerator, InitProcessGroupKwargs
 
 # Suppress benign per-paragraph warnings (long tokens are sub-chunked manually,
@@ -44,10 +44,23 @@ PRETRAIN_SEED       = 1337
 EPOCHS              = 5
 BATCH_SIZE          = 1       # per GPU; effective = BATCH_SIZE × num_GPUs × GRAD_ACCUM
 GRAD_ACCUM          = 8
-LR                  = 3e-5    # bumped from 1e-5 — encoder needs to actually move
-LR_LOG_S            = 1e-2    # ~333× encoder LR — required for UW to actually converge
-MAX_GRAD_NORM       = 1.0
-EMA_TAU             = 0.996   # DINO's value; slower, more stable teacher than 0.99
+# P-G-03: 4-group AdamW. Encoder LR drives the trunk; the small heads (IB,
+# projector, predictor) are randomly initialized and need a higher LR to catch
+# up. log_s needs ~333× encoder LR with weight_decay=0 to actually converge.
+LR_ENCODER          = 3e-5
+LR_IB_HEAD          = 1e-4    # ~3.3× encoder — random init, needs to move
+LR_PROJ_PRED        = 1e-4    # projector + predictor: same ratio
+LR_LOG_S            = 1e-2    # ~333× encoder LR — required for UW to converge
+# P-G-03: per-group clip contract. Encoder gets the standard 1.0; small heads
+# get tighter 0.5 so a noisy critic gradient cannot push the projector around.
+CLIP_ENCODER        = 1.0
+CLIP_IB_HEAD        = 0.5
+CLIP_PROJ_PRED      = 0.5
+# P-G-04: EMA τ ramps from EMA_TAU_START to EMA_TAU_END. Slower teacher
+# evolution at the end of training stabilizes the alignment targets when the
+# student is near convergence.
+EMA_TAU_START       = 0.996   # DINO's initial value
+EMA_TAU_END         = 0.9999
 BETA_KL_FINAL       = 1.0
 BETA_KL_WARMUP_FRAC = 0.25    # ramp β over first 25% of total optimizer steps
 FREE_BITS_NATS      = 0.05    # P-G-01: per-dim hard floor at 0.05 nats/dim → 12.8 nat total floor.
@@ -86,6 +99,14 @@ def collate_fn(batch):
 def beta_kl_schedule(step: int, total_steps: int) -> float:
     warmup = max(1, int(total_steps * BETA_KL_WARMUP_FRAC))
     return BETA_KL_FINAL * min(1.0, step / warmup)
+
+
+def ema_tau_schedule(step: int, total_steps: int) -> float:
+    """P-G-04: linear ramp from EMA_TAU_START to EMA_TAU_END over training.
+    Slower teacher evolution near the end → stable alignment targets when
+    student is near convergence."""
+    p = min(1.0, step / max(1, total_steps))
+    return EMA_TAU_START + p * (EMA_TAU_END - EMA_TAU_START)
 
 
 def mean_pairwise_cosine(buf: deque) -> float:
@@ -159,9 +180,15 @@ def train():
             "batch_size":           BATCH_SIZE,
             "grad_accum":           GRAD_ACCUM,
             "world_size":           accelerator.num_processes,
-            "lr":                   LR,
+            "lr_encoder":           LR_ENCODER,
+            "lr_ib_head":           LR_IB_HEAD,
+            "lr_proj_pred":         LR_PROJ_PRED,
             "lr_log_s":             LR_LOG_S,
-            "ema_tau":              EMA_TAU,
+            "clip_encoder":         CLIP_ENCODER,
+            "clip_ib_head":         CLIP_IB_HEAD,
+            "clip_proj_pred":       CLIP_PROJ_PRED,
+            "ema_tau_start":        EMA_TAU_START,
+            "ema_tau_end":          EMA_TAU_END,
             "beta_kl_final":        BETA_KL_FINAL,
             "beta_kl_warmup_frac":  BETA_KL_WARMUP_FRAC,
             "free_bits_nats":       FREE_BITS_NATS,
@@ -179,7 +206,7 @@ def train():
     accelerator.wait_for_everyone()
 
     dataset = load_ecthr()
-    model   = GlocalIBModel(ema_tau=EMA_TAU, device=str(device))
+    model   = GlocalIBModel(ema_tau=EMA_TAU_START, device=str(device))
 
     loader = DataLoader(
         dataset["train"], batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_fn
@@ -188,15 +215,30 @@ def train():
     total_steps  = (len(loader) // GRAD_ACCUM) * EPOCHS
     warmup_steps = max(1, total_steps // 10)
 
-    # Two-group AdamW: log_s needs much higher LR to converge, and weight decay
-    # would pull it toward 0 — fighting its natural drift toward log(L_i).
-    log_s_params = [p for n, p in model.named_parameters() if n == "log_s"]
-    other_params = [p for n, p in model.named_parameters() if n != "log_s"]
+    # P-G-03: 4-group AdamW. Each parameter belongs to exactly one group.
+    encoder_params:   list = []
+    ib_head_params:   list = []
+    proj_pred_params: list = []
+    log_s_params:     list = []
+    for n, p in model.named_parameters():
+        if n == "log_s":
+            log_s_params.append(p)
+        elif n.startswith("mu_head") or n.startswith("log_sigma_head"):
+            ib_head_params.append(p)
+        elif n.startswith("projector") or n.startswith("predictor"):
+            proj_pred_params.append(p)
+        elif n.startswith("encoder.") or n.startswith("attn_pool_student"):
+            encoder_params.append(p)
+        # encoder_teacher and attn_pool_teacher are requires_grad=False — skip
     opt = AdamW([
-        {"params": other_params, "lr": LR},
-        {"params": log_s_params, "lr": LR_LOG_S, "weight_decay": 0.0},
+        {"params": encoder_params,   "lr": LR_ENCODER},
+        {"params": ib_head_params,   "lr": LR_IB_HEAD},
+        {"params": proj_pred_params, "lr": LR_PROJ_PRED},
+        {"params": log_s_params,     "lr": LR_LOG_S, "weight_decay": 0.0},
     ])
-    scheduler = get_linear_schedule_with_warmup(opt, warmup_steps, total_steps)
+    # P-G-04: cosine LR schedule with warmup. Replaces V1's linear schedule.
+    # All 4 param groups follow the same cosine curve (scaled by their own LR).
+    scheduler = get_cosine_schedule_with_warmup(opt, warmup_steps, total_steps)
 
     model, opt, loader, scheduler = accelerator.prepare(model, opt, loader, scheduler)
 
@@ -310,16 +352,32 @@ def train():
                 mu_loss_buf.append(out[5].detach().to(torch.bfloat16))
 
                 grad_norm = None
+                grad_norm_ib_head   = 0.0
+                grad_norm_proj_pred = 0.0
                 if accelerator.sync_gradients:
-                    grad_norm = accelerator.clip_grad_norm_(model.parameters(), MAX_GRAD_NORM)
+                    # P-G-03: per-group clip contract. Tighter clip on the
+                    # randomly initialized heads (IB, projector, predictor) so
+                    # they cannot dominate the encoder's gradient direction.
+                    grad_norm = torch.nn.utils.clip_grad_norm_(
+                        encoder_params, max_norm=CLIP_ENCODER)
+                    if ib_head_params:
+                        grad_norm_ib_head = float(torch.nn.utils.clip_grad_norm_(
+                            ib_head_params, max_norm=CLIP_IB_HEAD).item())
+                    if proj_pred_params:
+                        grad_norm_proj_pred = float(torch.nn.utils.clip_grad_norm_(
+                            proj_pred_params, max_norm=CLIP_PROJ_PRED).item())
 
                 opt.step()
                 scheduler.step()
                 opt.zero_grad()
 
-                # EMA update after optimizer step — encoder + attention pool
+                # EMA update after optimizer step — encoder + attention pool.
+                # P-G-04: τ ramps with the schedule. Set the model's tau in-place
+                # so update_teacher_ema picks it up.
                 if accelerator.sync_gradients:
-                    accelerator.unwrap_model(model).update_teacher_ema()
+                    unwrapped = accelerator.unwrap_model(model)
+                    unwrapped.ema_tau = ema_tau_schedule(global_step, total_steps)
+                    unwrapped.update_teacher_ema()
 
             if accelerator.sync_gradients:
                 global_step += 1
@@ -409,9 +467,14 @@ def train():
                             "effective_rank_z_proj": eff_rank_z,
                             "effective_rank_mu":     eff_rank_mu,
                             "infonce_lb_zproj":      infonce_lb,
-                            "grad_norm":           grad_norm_value,
-                            "lr":                  scheduler.get_last_lr()[0],
-                            "lr_log_s":            scheduler.get_last_lr()[1],
+                            "grad_norm_encoder":   grad_norm_value,
+                            "grad_norm_ib_head":   grad_norm_ib_head,
+                            "grad_norm_proj_pred": grad_norm_proj_pred,
+                            "lr_encoder":          scheduler.get_last_lr()[0],
+                            "lr_ib_head":          scheduler.get_last_lr()[1],
+                            "lr_proj_pred":        scheduler.get_last_lr()[2],
+                            "lr_log_s":            scheduler.get_last_lr()[3],
+                            "ema_tau":             accelerator.unwrap_model(model).ema_tau,
                             "sec_per_step":        avg_step,
                             "examples_per_sec":    (BATCH_SIZE * GRAD_ACCUM * accelerator.num_processes) / max(avg_step, 1e-9),
                             "gpu_mem_gb":          gpu_mem_gb,
