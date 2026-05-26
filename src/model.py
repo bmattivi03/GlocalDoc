@@ -79,8 +79,11 @@ class GlocalIBModel(nn.Module):
             nn.Linear(512, 768),
         )
 
-        # Homoscedastic UW weights: [compress, local, inter, global]
-        self.log_s = nn.Parameter(torch.zeros(4))
+        # Homoscedastic UW weights: [local, inter, global]. P-G-02 pulled
+        # L_compress out of UW because UW assumes likelihoods and KL-to-prior
+        # is a regularizer — feeding it to UW attenuated the compression
+        # gradient by ~e^(-log(128)) ≈ 0.008 in V1.
+        self.log_s = nn.Parameter(torch.zeros(3))
 
         self.ema_tau        = ema_tau
         self.max_paragraphs = max_paragraphs
@@ -177,7 +180,7 @@ class GlocalIBModel(nn.Module):
           4  t_chunks        list[(N, 768)]   teacher all-paragraph reps (for L_local)
           5  mu              (B, 256)         IB mean
           6  log_sigma       (B, 256)         IB log-std (clamped to [-10, 10])
-          7  log_s           (4,)             UW weights (clamped to [-10, 10])
+          7  log_s           (3,)             UW weights [local, inter, global] (clamped)
           8  Z_proj          (B, 768)         student post-IB pre-predictor (logging only)
           9  z_partial       (B, 768)         student pre-IB pre-predictor (logging only)
         """

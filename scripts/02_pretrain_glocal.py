@@ -385,18 +385,16 @@ def train():
                             "l_cov_z_temporal":    l_cov_z.item(),
                             "l_var_mu_temporal":   l_var_m.item(),
                             "l_cov_mu_temporal":   l_cov_m.item(),
-                            "uw_contrib_compress": (lc * uw_weights[0]).item(),
-                            "uw_contrib_local":    (ll * uw_weights[1]).item(),
-                            "uw_contrib_inter":    (li * uw_weights[2]).item(),
-                            "uw_contrib_global":   (lg * uw_weights[3]).item(),
-                            "log_s_compress":      log_s[0].item(),
-                            "log_s_local":         log_s[1].item(),
-                            "log_s_inter":         log_s[2].item(),
-                            "log_s_global":        log_s[3].item(),
-                            "uw_weight_compress":  uw_weights[0].item(),
-                            "uw_weight_local":     uw_weights[1].item(),
-                            "uw_weight_inter":     uw_weights[2].item(),
-                            "uw_weight_global":    uw_weights[3].item(),
+                            "uw_contrib_local":    (ll * uw_weights[0]).item(),
+                            "uw_contrib_inter":    (li * uw_weights[1]).item(),
+                            "uw_contrib_global":   (lg * uw_weights[2]).item(),
+                            "log_s_local":         log_s[0].item(),
+                            "log_s_inter":         log_s[1].item(),
+                            "log_s_global":        log_s[2].item(),
+                            "uw_weight_local":     uw_weights[0].item(),
+                            "uw_weight_inter":     uw_weights[1].item(),
+                            "uw_weight_global":    uw_weights[2].item(),
+                            "beta_kl_contrib":     (beta_kl * lc).item(),
                             "beta_kl":             beta_kl,
                             "mu_abs_mean":         mu_det.abs().mean().item(),
                             "log_sigma_mean":      log_sigma_det.mean().item(),
@@ -444,7 +442,7 @@ def train():
                             f"l_v={lvar.item():.3f} l_cov={lcov.item():.3f} "
                             f"l_vZ={l_var_z.item():.3f} l_vμ={l_var_m.item():.3f}  "
                             f"log_s=[{log_s[0].item():.2f},{log_s[1].item():.2f},"
-                            f"{log_s[2].item():.2f},{log_s[3].item():.2f}]  "
+                            f"{log_s[2].item():.2f}]  "
                             f"β={beta_kl:.2f} act_kl={active_kl_dims:.2f} "
                             f"μ|·|={mu_det.abs().mean().item():.3f} "
                             f"coll={collapse_metric:.3f}  "

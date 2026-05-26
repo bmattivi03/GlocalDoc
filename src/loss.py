@@ -56,34 +56,41 @@ def glocal_ib_loss(
     Z_prime:   torch.Tensor,   # (B, 768) teacher full-doc
     Z_proj:    torch.Tensor,   # (B, 768) student post-IB post-predictor
     z_partial: torch.Tensor,   # (B, 768) student pre-IB partial-pool post-predictor (for L_inter)
-    s_chunks:  list,           # list[Tensor(N, 768)] student all-para reps (pre-pool, pre-predictor)
+    s_chunks:  list,           # list[Tensor(N, 768)] student all-para reps
     t_chunks:  list,           # list[Tensor(N, 768)] teacher all-para reps
     mu:        torch.Tensor,   # (B, 256)
     log_sigma: torch.Tensor,   # (B, 256) clamped log-σ
-    log_s:     torch.Tensor,   # (4,) clamped UW weights [compress, local, inter, global]
+    log_s:     torch.Tensor,   # (3,) clamped UW weights [local, inter, global]
     beta_kl: float = 1.0,
     free_bits_nats: float = 0.05,
     var_weight: float = 1.0,
     cov_weight: float = 0.04,
     var_gamma: float = 0.5,
 ):
-    """
-    Four-component hierarchical GlocalIB loss with homoscedastic uncertainty weighting,
-    plus anti-collapse variance + covariance regularizers on raw student paragraph reps.
+    """V2 loss: UW weights only the 3 alignment-family losses. L_compress is summed
+    outside UW with a fixed β coefficient. Anti-collapse VICReg terms remain
+    outside UW with fixed weights as in V1.
 
-    L_compress   β · KL penalty (with free bits) — forces IB bottleneck to compress
-    L_local      align all N paragraph pairs (teacher_i vs student_i)
-    L_inter      align student partial-pool (predictor) vs teacher full doc (pre-IB)
-    L_global     align student IB projection (predictor) vs teacher full doc (post-IB)
-    L_variance   VICReg variance hinge on per-doc paragraph reps (fixed weight, outside UW)
-    L_covariance VICReg covariance regularizer on per-doc paragraph reps (fixed weight, outside UW)
+    P-G-02: the prior V1 stack put L_compress INSIDE UW. With free_bits_nats=0.5
+    pinning L_compress ≈ 128 and the cosines bounded in [0, 2], the UW
+    optimizer rationally learned log_s_compress ≈ log(128) ≈ 4.85, attenuating
+    the compression gradient by ~e^(-4.85) ≈ 0.008. UW assumes per-loss
+    likelihoods whose variance can be learned (Kendall et al. arxiv:1705.07115);
+    a KL-to-prior is a regularizer, not a likelihood — feeding it to UW is a
+    category error that mutes the signal it's supposed to balance.
 
-    UW only weights the four original losses. Variance and covariance use fixed weights —
-    an anti-collapse signal must never be down-weightable by UW.
+    Components:
+      L_compress    β · KL penalty (with free bits) — FIXED weight, outside UW
+      L_local       align all N paragraph pairs (teacher_i vs student_i) — UW
+      L_inter       align student partial-pool (predictor) vs teacher pre-IB — UW
+      L_global      align student IB projection (predictor) vs teacher post-IB — UW
+      L_variance    VICReg variance hinge on per-doc paragraph reps — fixed weight
+      L_covariance  VICReg covariance regularizer on per-doc paragraph reps — fixed
 
     Returns (total, l_compress, l_local, l_inter, l_global, l_variance, l_covariance).
+    The 7-tuple shape is unchanged — only the way components are combined into total.
     """
-    l_compress = beta_kl * compression_loss(mu, log_sigma, free_bits_nats=free_bits_nats)
+    l_compress = compression_loss(mu, log_sigma, free_bits_nats=free_bits_nats)
     l_local    = alignment_loss(torch.cat(s_chunks), torch.cat(t_chunks))
     l_inter    = alignment_loss(z_partial, Z_prime.detach())
     l_global   = alignment_loss(Z_proj,    Z_prime.detach())
@@ -93,9 +100,15 @@ def glocal_ib_loss(
     l_variance   = torch.stack(var_terms).mean() if var_terms else Z_proj.new_zeros(())
     l_covariance = torch.stack(cov_terms).mean() if cov_terms else Z_proj.new_zeros(())
 
-    losses_uw = torch.stack([l_compress, l_local, l_inter, l_global])
-    total = (losses_uw * torch.exp(-log_s) + log_s).sum() \
+    # UW over the 3 alignment-family losses only.
+    losses_uw = torch.stack([l_local, l_inter, l_global])
+    uw_term = (losses_uw * torch.exp(-log_s) + log_s).sum()
+
+    total = uw_term \
+          + beta_kl * l_compress \
           + var_weight * l_variance \
           + cov_weight * l_covariance
 
+    # Returned l_compress is the RAW KL (post free-bits clamp, pre-β). Multiply
+    # by beta_kl downstream if you want the actually-applied term.
     return total, l_compress, l_local, l_inter, l_global, l_variance, l_covariance
