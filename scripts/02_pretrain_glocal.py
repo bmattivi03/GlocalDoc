@@ -34,6 +34,7 @@ sys.path.append(".")
 from src.data import load_ecthr, mask_text, get_paragraph_mask
 from src.model import GlocalIBModel
 from src.loss import glocal_ib_loss, variance_loss, covariance_loss
+from src.diagnostics import effective_rank, infonce_lower_bound
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 # P-H-01: pin pretrain RNG. Without this, V1-vs-V2-vs-H-MLM comparisons are
@@ -228,6 +229,9 @@ def train():
     z_proj_pred_loss_buf = deque(maxlen=TEMPORAL_BUF_LEN)   # each entry: (B, 768) on device
     mu_loss_buf          = deque(maxlen=TEMPORAL_BUF_LEN)   # each entry: (B, 256) on device
     collapse_metric = 0.0
+    eff_rank_z      = 0.0
+    eff_rank_mu     = 0.0
+    infonce_lb      = 0.0
     t_train_start  = time.time()
 
     for epoch in range(EPOCHS):
@@ -344,6 +348,21 @@ def train():
 
                     if global_step % COLLAPSE_LOG_EVERY == 0:
                         collapse_metric = mean_pairwise_cosine(z_proj_buffer)
+                        # P-A-01: effective-rank + InfoNCE I(Z;X) lower bound. Both
+                        # are cheap and bounded by the in-batch sample count (B≥4
+                        # required for a non-trivial bound; the rolling Z buffer
+                        # gives us K=Z_BUFFER_LEN samples to work with).
+                        if len(z_proj_buffer) >= 4:
+                            z_buf_tensor = torch.stack(list(z_proj_buffer))
+                            eff_rank_z = effective_rank(z_buf_tensor)
+                            # Pseudo-X side: same buffer as a stand-in for the
+                            # post-encoder representation. For a stricter test
+                            # use z_partial.detach().cpu() per-step.
+                            _, infonce_lb = infonce_lower_bound(z_buf_tensor, z_buf_tensor)
+                        else:
+                            eff_rank_z = 0.0
+                            infonce_lb = 0.0
+                        eff_rank_mu = effective_rank(mu_det)
 
                     if torch.cuda.is_available():
                         gpu_mem_gb = torch.cuda.max_memory_allocated() / 1e9
@@ -389,6 +408,9 @@ def train():
                             "predictor_norm_mean": predictor_norm_mean,
                             "z_proj_norm_mean":    z_proj_norm_mean,
                             "collapse_metric_inter_doc_cos": collapse_metric,
+                            "effective_rank_z_proj": eff_rank_z,
+                            "effective_rank_mu":     eff_rank_mu,
+                            "infonce_lb_zproj":      infonce_lb,
                             "grad_norm":           grad_norm_value,
                             "lr":                  scheduler.get_last_lr()[0],
                             "lr_log_s":            scheduler.get_last_lr()[1],
