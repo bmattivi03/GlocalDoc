@@ -49,9 +49,13 @@ MAX_GRAD_NORM       = 1.0
 EMA_TAU             = 0.996   # DINO's value; slower, more stable teacher than 0.99
 BETA_KL_FINAL       = 1.0
 BETA_KL_WARMUP_FRAC = 0.25    # ramp β over first 25% of total optimizer steps
-FREE_BITS_NATS      = 0.5     # 0.5 × 256 = 128 nat floor — FORCES mu to carry info (not noise).
-                              # Lower values (0.05) let mu collapse to 0 with sigma=1, making
-                              # z_sample = mu + sigma*ε ≈ pure noise → downstream learns constant.
+FREE_BITS_NATS      = 0.05    # P-G-01: per-dim hard floor at 0.05 nats/dim → 12.8 nat total floor.
+                              # The prior value of 0.5 was the V1 design's #1 confound: per-dim KL
+                              # is ≈ 0 early in training (μ→0, σ→1), so torch.clamp(min=0.5)
+                              # returns 0.5 with zero subgradient through mu_head. The encoder is
+                              # never penalized for storing 0 information up to the floor → IB is
+                              # decorative. 0.05 is the Kingma 2016 free-bits scale (~per-group
+                              # threshold); 0.5 disables compression entirely. See [arxiv:1606.04934].
 VAR_WEIGHT          = 5.0     # encoder s_chunks anti-collapse
 COV_WEIGHT          = 0.04    # VICReg default
 VAR_GAMMA           = 0.5     # per-dim std hinge threshold (used for s_chunks AND temporal buffers)
@@ -93,6 +97,25 @@ def mean_pairwise_cosine(buf: deque) -> float:
     K = z.shape[0]
     # off-diagonal mean
     return ((sims.sum() - K) / (K * (K - 1))).item()
+
+
+def kl_gini(per_dim_kl: torch.Tensor) -> float:
+    """Gini coefficient on per-dim KL averaged over batch.
+
+    P-G-01 / Achille-Soatto diagnostic: a healthy IB concentrates information
+    in a small sufficient subset → Gini near 1. Diffuse KL (all dims carrying
+    a little) → Gini near 0 → bottleneck not actually compressing.
+    per_dim_kl: (B, D) — non-negative per-dim KL.
+    """
+    if per_dim_kl.numel() == 0:
+        return 0.0
+    v = per_dim_kl.mean(dim=0).flatten().sort().values  # (D,) sorted ascending
+    n = v.numel()
+    if n < 2 or v.sum() <= 0:
+        return 0.0
+    # Gini = (2 Σ i*v_i / (n Σ v_i)) - (n+1)/n
+    i = torch.arange(1, n + 1, device=v.device, dtype=v.dtype)
+    return ((2 * (i * v).sum() / (n * v.sum())) - (n + 1) / n).item()
 
 
 def _seed_pretrain(seed: int, rank: int) -> None:
@@ -314,6 +337,8 @@ def train():
                         1 + 2 * log_sigma_det - mu_det.pow(2) - torch.exp(2 * log_sigma_det)
                     )
                     active_kl_dims = (per_dim_kl > FREE_BITS_NATS).float().mean().item()
+                    kl_per_dim_max = per_dim_kl.mean(dim=0).max().item()  # heaviest dim
+                    kl_gini_coeff  = kl_gini(per_dim_kl)
                     predictor_norm_mean = out[1].detach().float().norm(dim=-1).mean().item()
                     z_proj_norm_mean    = out[8].detach().float().norm(dim=-1).mean().item()
 
@@ -357,6 +382,9 @@ def train():
                             "mu_abs_mean":         mu_det.abs().mean().item(),
                             "log_sigma_mean":      log_sigma_det.mean().item(),
                             "kl_per_dim_mean":     per_dim_kl.mean().item(),
+                            "kl_per_dim_max":      kl_per_dim_max,
+                            "kl_gini":             kl_gini_coeff,
+                            "kl_per_dim_hist":     wandb.Histogram(per_dim_kl.mean(dim=0).cpu().numpy()),
                             "active_kl_dims":      active_kl_dims,
                             "predictor_norm_mean": predictor_norm_mean,
                             "z_proj_norm_mean":    z_proj_norm_mean,
