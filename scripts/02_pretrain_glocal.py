@@ -10,9 +10,11 @@ os.environ.setdefault("TORCH_NCCL_ASYNC_ERROR_HANDLING", "1")
 
 import sys
 import time
+import random
 from collections import deque
 from datetime import timedelta
 
+import numpy as np
 import torch
 import torch.distributed as dist
 import torch.nn.functional as F
@@ -34,6 +36,10 @@ from src.model import GlocalIBModel
 from src.loss import glocal_ib_loss, variance_loss, covariance_loss
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
+# P-H-01: pin pretrain RNG. Without this, V1-vs-V2-vs-H-MLM comparisons are
+# polluted by random init drift larger than the disputed few-shot gap
+# (MDE at 5 fine-tune seeds ≈ 3.7 macro-F1).
+PRETRAIN_SEED       = 1337
 EPOCHS              = 5
 BATCH_SIZE          = 1       # per GPU; effective = BATCH_SIZE × num_GPUs × GRAD_ACCUM
 GRAD_ACCUM          = 8
@@ -89,6 +95,20 @@ def mean_pairwise_cosine(buf: deque) -> float:
     return ((sims.sum() - K) / (K * (K - 1))).item()
 
 
+def _seed_pretrain(seed: int, rank: int) -> None:
+    """Seed all RNGs that affect model init, dropout, and data shuffles.
+
+    Per-rank offset on torch.cuda RNGs only — model init and Python RNG share
+    the same seed so DDP starts from identical weights. Without this, the
+    rank-0 broadcast of teacher params is the only thing keeping ranks in sync.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed + rank)
+
+
 def train():
     # 30-min collective timeout: protects against a slow first step (kernel JIT,
     # long-doc encode) tripping the default 10-min NCCL watchdog and killing the run.
@@ -98,6 +118,7 @@ def train():
         kwargs_handlers=[InitProcessGroupKwargs(timeout=timedelta(minutes=30))],
     )
     device = accelerator.device
+    _seed_pretrain(PRETRAIN_SEED, accelerator.process_index)
 
     if accelerator.is_main_process:
         print(
@@ -109,6 +130,7 @@ def train():
         os.makedirs("checkpoints", exist_ok=True)
         wandb.init(project=WANDB_PROJECT, name=CONDITION, config={
             "condition":           CONDITION,
+            "pretrain_seed":        PRETRAIN_SEED,
             "epochs":               EPOCHS,
             "batch_size":           BATCH_SIZE,
             "grad_accum":           GRAD_ACCUM,
