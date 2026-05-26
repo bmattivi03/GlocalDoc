@@ -73,6 +73,11 @@ FREE_BITS_NATS      = 0.05    # P-G-01: per-dim hard floor at 0.05 nats/dim → 
 VAR_WEIGHT          = 5.0     # encoder s_chunks anti-collapse
 COV_WEIGHT          = 0.04    # VICReg default
 VAR_GAMMA           = 0.5     # per-dim std hinge threshold (used for s_chunks AND temporal buffers)
+# P-C-01: per-paragraph token MLM loss outside UW. Fixed weight — the goal is
+# to match H-MLM's per-paragraph supervision-density signal alongside GlocalIB,
+# not to outweigh it. β=1.0 matches the H-MLM loss weighting in the SMITH-style
+# baseline (scripts/03_pretrain_mlm.py uses 0.5/0.5).
+MLM_WEIGHT          = 1.0
 # Temporal anti-collapse on Z_proj_pred and mu (rolling GPU buffers, gradient flows
 # through current sample only). Addresses the downstream collapse mode where the
 # IB+projector+predictor chain maps varied encoder outputs to constant final reps.
@@ -200,6 +205,7 @@ def train():
             "mu_var_weight":        MU_VAR_WEIGHT,
             "mu_cov_weight":        MU_COV_WEIGHT,
             "temporal_buf_len":     TEMPORAL_BUF_LEN,
+            "mlm_weight":           MLM_WEIGHT,
         })
     # Block non-main ranks until main has created checkpoints/ — avoids a race
     # at the first accelerator.save_state() call.
@@ -216,20 +222,33 @@ def train():
     warmup_steps = max(1, total_steps // 10)
 
     # P-G-03: 4-group AdamW. Each parameter belongs to exactly one group.
+    # Note: in V2, the encoder is RobertaForMaskedLM exposed at `encoder_full`;
+    # body and LM head are both in the "encoder" group (they share embedding
+    # weights so a uniform LR is appropriate).
     encoder_params:   list = []
     ib_head_params:   list = []
     proj_pred_params: list = []
     log_s_params:     list = []
     for n, p in model.named_parameters():
+        if not p.requires_grad:
+            continue
         if n == "log_s":
             log_s_params.append(p)
         elif n.startswith("mu_head") or n.startswith("log_sigma_head"):
             ib_head_params.append(p)
         elif n.startswith("projector") or n.startswith("predictor"):
             proj_pred_params.append(p)
-        elif n.startswith("encoder.") or n.startswith("attn_pool_student"):
+        elif n.startswith("encoder_full") or n.startswith("attn_pool_student"):
             encoder_params.append(p)
         # encoder_teacher and attn_pool_teacher are requires_grad=False — skip
+    if accelerator.is_main_process:
+        print(
+            f"[param groups] encoder={sum(p.numel() for p in encoder_params):,} "
+            f"ib_head={sum(p.numel() for p in ib_head_params):,} "
+            f"proj_pred={sum(p.numel() for p in proj_pred_params):,} "
+            f"log_s={sum(p.numel() for p in log_s_params):,}",
+            flush=True,
+        )
     opt = AdamW([
         {"params": encoder_params,   "lr": LR_ENCODER},
         {"params": ib_head_params,   "lr": LR_IB_HEAD},
@@ -338,11 +357,17 @@ def train():
                     l_var_m = variance_loss(mu_all, gamma=VAR_GAMMA)
                     l_cov_m = covariance_loss(mu_all)
 
+                # P-C-01: per-paragraph token MLM loss outside UW. This is the
+                # supervision-density-matched signal that closes the V1 30× gap to
+                # H-MLM. Carries gradient through encoder + lm_head.
+                l_mlm = accelerator.unwrap_model(model).compute_mlm_loss(full_batch)
+
                 total = total \
                       + Z_PROJ_VAR_WEIGHT * l_var_z \
                       + Z_PROJ_COV_WEIGHT * l_cov_z \
                       + MU_VAR_WEIGHT     * l_var_m \
-                      + MU_COV_WEIGHT     * l_cov_m
+                      + MU_COV_WEIGHT     * l_cov_m \
+                      + MLM_WEIGHT        * l_mlm
 
                 accelerator.backward(total)
 
@@ -443,6 +468,7 @@ def train():
                             "l_cov_z_temporal":    l_cov_z.item(),
                             "l_var_mu_temporal":   l_var_m.item(),
                             "l_cov_mu_temporal":   l_cov_m.item(),
+                            "l_mlm":               l_mlm.item(),
                             "uw_contrib_local":    (ll * uw_weights[0]).item(),
                             "uw_contrib_inter":    (li * uw_weights[1]).item(),
                             "uw_contrib_global":   (lg * uw_weights[2]).item(),

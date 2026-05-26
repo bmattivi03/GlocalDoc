@@ -2,7 +2,12 @@ import contextlib
 import copy
 import torch
 import torch.nn as nn
-from transformers import RobertaModel, RobertaTokenizerFast
+from transformers import (
+    DataCollatorForLanguageModeling,
+    RobertaForMaskedLM,
+    RobertaModel,
+    RobertaTokenizerFast,
+)
 
 
 class AttentionPooling(nn.Module):
@@ -35,19 +40,27 @@ class GlocalIBModel(nn.Module):
     ):
         super().__init__()
         self.tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
-        # Student encoder — receives gradient.
-        self.encoder   = RobertaModel.from_pretrained("distilroberta-base")
-        self.encoder.config.use_cache = False
+        # P-C-01: student is RobertaForMaskedLM so we have a built-in MLM head
+        # for per-paragraph token-prediction. `self.encoder` is a PROPERTY that
+        # returns the body — using an attribute assignment would duplicate the
+        # body's parameters under both `encoder.*` and `encoder_full.*` names
+        # in named_parameters().
+        self.encoder_full = RobertaForMaskedLM.from_pretrained("distilroberta-base")
+        self.encoder_full.config.use_cache = False
+        self.encoder_full.roberta.config.use_cache = False
 
-        # BYOL-style EMA teacher encoder (separate deepcopy). The teacher provides
-        # alignment targets that are stable across student updates, removing the
-        # trivial collapse fixed point where a single shared encoder could satisfy
-        # all alignment losses by becoming input-invariant. Updated by EMA only,
-        # never by gradient.
-        self.encoder_teacher = copy.deepcopy(self.encoder)
+        # BYOL-style EMA teacher encoder — body only, no MLM head. Provides
+        # alignment targets that are stable across student updates. Updated by
+        # EMA only, never by gradient.
+        self.encoder_teacher = copy.deepcopy(self.encoder_full.roberta)
         for p in self.encoder_teacher.parameters():
             p.requires_grad = False
         self.encoder_teacher.eval()
+
+        # P-C-01: HF data collator does the 15%-mask sampling cleanly.
+        self.mlm_collator = DataCollatorForLanguageModeling(
+            tokenizer=self.tokenizer, mlm_probability=0.15, return_tensors="pt"
+        )
 
         # Separate attention pools: student trains via gradient, teacher updated via EMA.
         self.attn_pool_student = AttentionPooling(dim=768, max_chunks=max_paragraphs)
@@ -99,6 +112,16 @@ class GlocalIBModel(nn.Module):
         self.max_paragraphs = max_paragraphs
         self.to(device)
 
+    # P-C-01: properties for the encoder body + LM head, to avoid duplicating
+    # parameter registrations under multiple module paths.
+    @property
+    def encoder(self):
+        return self.encoder_full.roberta
+
+    @property
+    def lm_head(self):
+        return self.encoder_full.lm_head
+
     # ------------------------------------------------------------------
     # Internal paragraph encoding
     # ------------------------------------------------------------------
@@ -140,6 +163,36 @@ class GlocalIBModel(nn.Module):
             cls_vecs = enc_module(**enc).last_hidden_state[:, 0, :]
 
         return torch.stack([cls_vecs[s:e].mean(0) for s, e in boundaries])
+
+    # ------------------------------------------------------------------
+    # P-C-01: per-paragraph token MLM loss
+    # ------------------------------------------------------------------
+
+    def compute_mlm_loss(self, full_batch: list) -> torch.Tensor:
+        """Per-paragraph masked-language-modeling loss across all paragraphs.
+
+        Closes the 30× supervision-density gap that V1's GlocalIB had vs
+        H-MLM. Each paragraph in `full_batch` is tokenized, masked at 15%
+        via the HF collator, encoded through the STUDENT body, and scored
+        through the LM head with cross-entropy against the original tokens
+        (only at the masked positions, since the collator sets labels=-100
+        elsewhere).
+
+        Returned tensor carries gradient through encoder + lm_head. Caller
+        adds it OUTSIDE the UW stack with a fixed coefficient.
+        """
+        all_para_inputs = []
+        for doc in full_batch:
+            for para in doc:
+                ids = self.tokenizer.encode(para, truncation=True, max_length=512)
+                if len(ids) > 2:  # at least one non-special token
+                    all_para_inputs.append({"input_ids": ids})
+        if not all_para_inputs:
+            return self.encoder.embeddings.word_embeddings.weight.new_zeros(())
+        batch = self.mlm_collator(all_para_inputs)
+        batch = {k: v.to(self.encoder.device) for k, v in batch.items()}
+        out = self.encoder_full(**batch)
+        return out.loss
 
     # ------------------------------------------------------------------
     # EMA update (call after every optimizer.step)
