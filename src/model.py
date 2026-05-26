@@ -85,6 +85,16 @@ class GlocalIBModel(nn.Module):
         # gradient by ~e^(-log(128)) ≈ 0.008 in V1.
         self.log_s = nn.Parameter(torch.zeros(3))
 
+        # P-B-04: DINO-style teacher centering. Running mean of teacher
+        # full-doc outputs, subtracted from Z_prime before alignment so the
+        # teacher cannot collapse to a single output (which would let the
+        # student trivially satisfy L_global by becoming constant). EMA
+        # momentum 0.9 — fast enough to track distribution drift, slow
+        # enough to smooth per-batch noise.
+        self.register_buffer("teacher_center", torch.zeros(768))
+        self.center_momentum = 0.9
+        self._pending_center_update = None   # set inside forward, consumed in update_teacher_ema
+
         self.ema_tau        = ema_tau
         self.max_paragraphs = max_paragraphs
         self.to(device)
@@ -136,9 +146,9 @@ class GlocalIBModel(nn.Module):
     # ------------------------------------------------------------------
 
     def update_teacher_ema(self):
-        """EMA-update both the teacher encoder and the teacher attention pool.
-        Buffers (LayerNorm running stats, etc.) are hard-copied from student
-        each call to keep them synced — EMA on buffers tends to drift."""
+        """EMA-update teacher encoder, teacher attention pool, and the DINO
+        teacher_center (P-B-04). Buffers (LayerNorm running stats, etc.) are
+        hard-copied from student to avoid drift."""
         with torch.no_grad():
             # Encoder parameters
             for p_t, p_s in zip(
@@ -158,6 +168,13 @@ class GlocalIBModel(nn.Module):
                 self.attn_pool_student.parameters(),
             ):
                 p_t.data.mul_(self.ema_tau).add_(p_s.data, alpha=1.0 - self.ema_tau)
+            # P-B-04: teacher centering. Consume the pending batch-mean
+            # cached during forward; apply EMA with center_momentum.
+            if self._pending_center_update is not None:
+                self.teacher_center.mul_(self.center_momentum).add_(
+                    self._pending_center_update, alpha=1.0 - self.center_momentum
+                )
+                self._pending_center_update = None
 
     # ------------------------------------------------------------------
     # Forward pass
@@ -173,7 +190,7 @@ class GlocalIBModel(nn.Module):
         Returns 10-tuple. Loss code consumes indices 0–7; indices 8–9 are for
         logging only (raw pre-predictor vectors to diagnose predictor health).
 
-          0  Z_prime         (B, 768)         teacher full-doc repr (EMA teacher, stop-grad)
+          0  Z_prime_centered (B, 768)        teacher full-doc repr with DINO centering applied (stop-grad)
           1  Z_proj_pred     (B, 768)         student post-IB, post-predictor (for L_global)
           2  z_partial_pred  (B, 768)         student partial-pool, post-predictor (for L_inter)
           3  s_chunks        list[(N, 768)]   student all-paragraph reps (for L_local, var, cov)
@@ -234,15 +251,23 @@ class GlocalIBModel(nn.Module):
 
         log_s = torch.clamp(self.log_s, min=-10, max=10)
 
+        # P-B-04: DINO-style centering. Cache batch mean for the next EMA update;
+        # subtract running center from Z_prime so the teacher cannot trivially
+        # collapse to a single output. No gradient through the center.
+        Z_prime_stacked = torch.stack(Z_prime_list)
+        with torch.no_grad():
+            self._pending_center_update = Z_prime_stacked.mean(dim=0).detach()
+            Z_prime_centered = Z_prime_stacked - self.teacher_center.unsqueeze(0)
+
         return (
-            torch.stack(Z_prime_list),         # 0 (B, 768)
+            Z_prime_centered,                  # 0 (B, 768) — center-subtracted
             torch.stack(Z_proj_pred_list),     # 1 (B, 768)
             torch.stack(z_partial_pred_list),  # 2 (B, 768)
             s_chunks_list,                     # 3 list[(N, 768)]
             t_chunks_list,                     # 4 list[(N, 768)]
             torch.stack(mu_list),              # 5 (B, 256)
             torch.stack(log_sigma_list),       # 6 (B, 256)
-            log_s,                             # 7 (4,)
+            log_s,                             # 7 (3,)
             torch.stack(Z_proj_list),          # 8 (B, 768)  logging only
             torch.stack(z_partial_list),       # 9 (B, 768)  logging only
         )
