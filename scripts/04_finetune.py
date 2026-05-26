@@ -51,6 +51,51 @@ def seed_everything(seed: int):
     torch.cuda.manual_seed_all(seed)
 
 
+def calibrate_temperature(clf, val_split) -> float:
+    """P-H-02: post-hoc temperature scaling on validation logits.
+
+    Refits the classifier's temperature (Guo et al. 2017 / arxiv:1706.04599)
+    to minimize BCE on val without retraining the rest of the model. Only
+    works on ProtoClassifier instances; returns None for DocumentClassifier
+    (which has no exposed temperature).
+
+    Returns the new log_temperature (also set in-place on clf).
+    """
+    if not hasattr(clf, "log_temperature"):
+        return None
+    clf.eval()
+    # Collect val cosines (logits / current temperature) once.
+    with torch.no_grad():
+        cur_temp = clf.log_temperature.exp().item()
+        cosines, targets = [], []
+        for ex in val_split:
+            logits = clf([ex["text"]]) / cur_temp                  # back to raw cosines
+            cosines.append(logits)
+            t = torch.zeros(1, 10, device=logits.device)
+            for lbl in ex["labels"]:
+                if lbl < 10:
+                    t[0][lbl] = 1.0
+            targets.append(t)
+        cosines = torch.cat(cosines, dim=0)
+        targets = torch.cat(targets, dim=0)
+
+    log_T = torch.nn.Parameter(torch.zeros(1, device=cosines.device))
+    opt = torch.optim.LBFGS([log_T], lr=0.05, max_iter=200, line_search_fn="strong_wolfe")
+
+    def closure():
+        opt.zero_grad()
+        loss = torch.nn.functional.binary_cross_entropy_with_logits(
+            log_T.exp() * cosines, targets
+        )
+        loss.backward()
+        return loss
+
+    opt.step(closure)
+    new_log_T = float(log_T.detach().item())
+    clf.log_temperature.data = log_T.detach().clone().view(())
+    return new_log_T
+
+
 def load_encoder(path, ckpt_type):
     """Returns (encoder, tokenizer, attn_pool, mu_head, projector).
 
@@ -150,6 +195,9 @@ def run_few_shot(
             best_state = {k: v.cpu().clone() for k, v in clf.state_dict().items()}
 
     clf.load_state_dict(best_state)
+    # P-H-02: post-hoc temperature scaling on val before test eval.
+    # No-op for DocumentClassifier (no exposed temperature).
+    new_log_T = calibrate_temperature(clf, val_split)
     clf.eval()
     preds, targets = [], []
     with torch.no_grad():
