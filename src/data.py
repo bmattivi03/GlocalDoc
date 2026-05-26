@@ -3,6 +3,23 @@ import random
 from datasets import load_dataset
 
 
+# ECtHR Article A labels — used by ProtoClassifier (P-E-02 / P-J-03) to
+# initialize label prototypes from label-text encodings instead of random.
+# Order matches `coastalcph/lex_glue / ecthr_a` train["labels"] indices.
+ECTHR_LABEL_TEXTS: list[str] = [
+    "Article 2: right to life",
+    "Article 3: prohibition of torture and inhuman or degrading treatment",
+    "Article 5: right to liberty and security",
+    "Article 6: right to a fair trial",
+    "Article 8: right to respect for private and family life",
+    "Article 9: freedom of thought, conscience and religion",
+    "Article 10: freedom of expression",
+    "Article 11: freedom of assembly and association",
+    "Article 14: prohibition of discrimination",
+    "Article 1 of Protocol 1: protection of property",
+]
+
+
 def load_ecthr(min_paragraphs: int = 5, max_paragraphs: int = 50):
     """Load ECtHR and filter to documents with 5–50 paragraphs."""
     dataset = load_dataset("coastalcph/lex_glue", "ecthr_a")

@@ -9,8 +9,13 @@ from sklearn.metrics import f1_score
 from transformers import RobertaModel, RobertaTokenizerFast, get_cosine_schedule_with_warmup
 
 sys.path.append(".")
-from src.data import load_ecthr, sample_few_shot
-from src.model import GlocalIBModel, DocumentClassifier, AttentionPooling
+from src.data import ECTHR_LABEL_TEXTS, load_ecthr, sample_few_shot
+from src.model import (
+    AttentionPooling,
+    DocumentClassifier,
+    GlocalIBModel,
+    ProtoClassifier,
+)
 
 # --- CONFIG ---
 N_LIST          = [10, 50, 100]
@@ -30,6 +35,13 @@ CONDITIONS = {
     "no_pretrain": (None,                              "raw"),
 }
 
+# V2 (P-E-02 / P-J-03): glocal_ib uses ProtoClassifier so the IB head + projector
+# are on-path at evaluation. h_mlm and no_pretrain use ProtoClassifier *without*
+# the IB chain (mu_head=None, projector=None) — i.e., same prototype + temperature
+# head but the encoder output goes directly to attn_pool. Set to False to revert
+# any/all conditions to V1's DocumentClassifier with a Linear head.
+USE_PROTO_CLASSIFIER = {"glocal_ib": True, "h_mlm": True, "no_pretrain": True}
+
 
 def seed_everything(seed: int):
     """Seed all RNGs that affect classifier-head init, dropout, and data shuffles."""
@@ -40,14 +52,23 @@ def seed_everything(seed: int):
 
 
 def load_encoder(path, ckpt_type):
-    """Returns (encoder, tokenizer, attn_pool) ready for DocumentClassifier."""
+    """Returns (encoder, tokenizer, attn_pool, mu_head, projector).
+
+    P-E-02 / P-J-03: V1 dropped mu_head and projector when loading a GlocalIB
+    checkpoint, making the IB latent invisible at evaluation. V2 returns them
+    so the ProtoClassifier can put the IB chain back on-path at fine-tune.
+    For h_mlm and no_pretrain, mu_head and projector are None — those
+    conditions don't have an IB head.
+    """
     if ckpt_type == "glocal":
-        # Load the full GlocalIB model and return the STUDENT pool — that's the
-        # one that actually trained via gradient. The teacher pool is an EMA of
-        # the student and barely diverges from random init over a short pre-train.
+        # Load the full GlocalIB model and return:
+        #  - encoder (the body — RobertaModel)
+        #  - tokenizer
+        #  - attn_pool_student (gradient-trained, not the EMA copy)
+        #  - mu_head, projector (so the IB chain is on-path at fine-tune)
         m = GlocalIBModel(device=DEVICE)
         m.load_state_dict(torch.load(path, map_location=DEVICE))
-        return m.encoder, m.tokenizer, m.attn_pool_student
+        return m.encoder, m.tokenizer, m.attn_pool_student, m.mu_head, m.projector
     elif ckpt_type == "h_mlm":
         ckpt      = torch.load(path, map_location=DEVICE)
         tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
@@ -56,22 +77,34 @@ def load_encoder(path, ckpt_type):
         encoder   = encoder.to(DEVICE)
         attn_pool = AttentionPooling(dim=768, max_chunks=50).to(DEVICE)
         attn_pool.load_state_dict(ckpt["attn_pool_state"])
-        return encoder, tokenizer, attn_pool
+        return encoder, tokenizer, attn_pool, None, None
     else:  # "raw" — no pre-training baseline
         tokenizer = RobertaTokenizerFast.from_pretrained("distilroberta-base")
         encoder   = RobertaModel.from_pretrained("distilroberta-base", add_pooling_layer=False).to(DEVICE)
         attn_pool = AttentionPooling(dim=768, max_chunks=50).to(DEVICE)
-        return encoder, tokenizer, attn_pool
+        return encoder, tokenizer, attn_pool, None, None
 
 
-def run_few_shot(encoder, tokenizer, attn_pool, train_split, val_split, test_split, n, seed):
-    # Seed everything BEFORE constructing DocumentClassifier so the classifier
-    # head's nn.Linear init actually depends on `seed`. Without this, the 5 seeds
-    # would only vary which few-shot examples are sampled, not the head init.
+def run_few_shot(
+    encoder, tokenizer, attn_pool, mu_head, projector,
+    train_split, val_split, test_split, n, seed,
+    use_proto: bool = True,
+):
+    # Seed everything BEFORE constructing the classifier so the head init
+    # actually depends on `seed`. Without this, the 5 seeds would only vary
+    # which few-shot examples are sampled, not the head init.
     seed_everything(seed)
 
     few_shot  = sample_few_shot(train_split, n, seed)
-    clf       = DocumentClassifier(encoder, tokenizer, attn_pool=attn_pool, device=DEVICE)
+    if use_proto:
+        clf = ProtoClassifier(
+            encoder, tokenizer, attn_pool,
+            label_texts=ECTHR_LABEL_TEXTS,
+            mu_head=mu_head, projector=projector,
+            device=DEVICE,
+        )
+    else:
+        clf = DocumentClassifier(encoder, tokenizer, attn_pool=attn_pool, device=DEVICE)
     opt       = AdamW(clf.parameters(), lr=LR)
     # BCEWithLogitsLoss — numerically stable with raw logits (DocumentClassifier returns logits).
     criterion = torch.nn.BCEWithLogitsLoss()
@@ -146,20 +179,30 @@ def main():
             continue
 
         print(f"\n=== Condition: {cond} ===")
-        encoder, tokenizer, attn_pool = load_encoder(path, ckpt_type)
+        encoder, tokenizer, attn_pool, mu_head, projector = load_encoder(path, ckpt_type)
         encoder_state_init   = {k: v.cpu().clone() for k, v in encoder.state_dict().items()}
         attn_pool_state_init = {k: v.cpu().clone() for k, v in attn_pool.state_dict().items()}
+        mu_head_state_init    = ({k: v.cpu().clone() for k, v in mu_head.state_dict().items()}
+                                 if mu_head is not None else None)
+        projector_state_init  = ({k: v.cpu().clone() for k, v in projector.state_dict().items()}
+                                 if projector is not None else None)
         all_results[cond] = {}
+        use_proto = USE_PROTO_CLASSIFIER.get(cond, True)
 
         for n in N_LIST:
             macro_scores, micro_scores = [], []
             for seed in SEEDS:
                 encoder.load_state_dict(encoder_state_init)
                 attn_pool.load_state_dict(attn_pool_state_init)
+                if mu_head is not None:
+                    mu_head.load_state_dict(mu_head_state_init)
+                if projector is not None:
+                    projector.load_state_dict(projector_state_init)
                 metrics = run_few_shot(
-                    encoder, tokenizer, attn_pool,
+                    encoder, tokenizer, attn_pool, mu_head, projector,
                     dataset["train"], dataset["validation"], dataset["test"],
                     n, seed,
+                    use_proto=use_proto,
                 )
                 macro_scores.append(metrics["macro_f1"])
                 micro_scores.append(metrics["micro_f1"])

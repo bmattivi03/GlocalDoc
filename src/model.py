@@ -2,6 +2,7 @@ import contextlib
 import copy
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from transformers import (
     DataCollatorForLanguageModeling,
     RobertaForMaskedLM,
@@ -385,3 +386,106 @@ class DocumentClassifier(nn.Module):
             for paras in paragraphs_batch
         ])                                               # (B, 768)
         return self.classifier(doc_vecs)                # (B, num_labels) — logits
+
+
+class ProtoClassifier(nn.Module):
+    """V2 fine-tune classifier (P-E-02 + P-J-03).
+
+    Differences from V1's DocumentClassifier:
+
+    1. Uses the IB head and projector at fine-tune time. V1's load_encoder
+       discarded mu_head/log_sigma_head/projector → the IB latent the
+       bottleneck was trained to produce was *invisible at evaluation*. V2
+       routes the document representation through projector(mu_head(...)),
+       making the IB on-path.
+
+    2. Label-text-initialized prototypes (one (768,) vector per class).
+       Each prototype starts as projector(mu_head(encoder(label_text))) and
+       is then fine-tuned via gradient. Cosine similarity to the prototypes
+       gives the logits (scaled by a learnable temperature).
+
+    Pass mu_head=None, projector=None to skip the IB chain (use this for
+    h_mlm and no_pretrain so the comparison is apples-to-apples — they
+    don't have an IB head).
+    """
+
+    def __init__(
+        self,
+        encoder,
+        tokenizer,
+        attn_pool,
+        label_texts: list,
+        mu_head: nn.Module | None = None,
+        projector: nn.Module | None = None,
+        device: str = "cuda",
+        temperature_init: float = 10.0,
+        max_paragraphs: int = 50,
+    ):
+        super().__init__()
+        self.encoder        = encoder
+        self.tokenizer      = tokenizer
+        self.attn_pool      = attn_pool
+        self.mu_head        = mu_head
+        self.projector      = projector
+        self.max_paragraphs = max_paragraphs
+        # Learnable temperature — multiplies the cosine before BCE/CE. Init
+        # at 10 puts the cosines in [-10, 10] which is roughly the right
+        # scale for BCEWithLogitsLoss to receive meaningful gradient.
+        self.log_temperature = nn.Parameter(torch.tensor(float(torch.log(torch.tensor(temperature_init)))))
+
+        # Initialize prototypes by encoding label texts through the same
+        # representation path the documents will be encoded through.
+        with torch.no_grad():
+            proto_init = []
+            for txt in label_texts:
+                enc = tokenizer(
+                    txt, return_tensors="pt", truncation=True, max_length=64
+                ).to(device)
+                # Encoder body output → take CLS → IB head → projector
+                cls_vec = encoder(**enc).last_hidden_state[:, 0, :]   # (1, 768)
+                if mu_head is not None and projector is not None:
+                    rep = projector(mu_head(cls_vec)).squeeze(0)
+                else:
+                    rep = cls_vec.squeeze(0)
+                proto_init.append(rep)
+        self.prototypes = nn.Parameter(torch.stack(proto_init))    # (num_labels, 768)
+        self.to(device)
+
+    @property
+    def num_labels(self) -> int:
+        return self.prototypes.shape[0]
+
+    def _doc_rep(self, paragraphs: list) -> torch.Tensor:
+        """(768,) document representation. Goes through the IB chain if available."""
+        CHUNK_SIZE  = 510
+        sub_chunks: list = []
+        boundaries: list = []
+        for para in paragraphs:
+            ids   = self.tokenizer.encode(para, add_special_tokens=False)
+            start = len(sub_chunks)
+            if len(ids) <= CHUNK_SIZE:
+                sub_chunks.append(para)
+            else:
+                for i in range(0, len(ids), CHUNK_SIZE):
+                    sub_chunks.append(self.tokenizer.decode(ids[i:i + CHUNK_SIZE]))
+            boundaries.append((start, len(sub_chunks)))
+        enc = self.tokenizer(
+            sub_chunks, padding=True, truncation=True,
+            max_length=512, return_tensors="pt",
+        ).to(self.encoder.device)
+        cls_vecs = self.encoder(**enc).last_hidden_state[:, 0, :]
+        para_reps = torch.stack([cls_vecs[s:e].mean(0) for s, e in boundaries])  # (N, 768)
+        partial   = self.attn_pool(para_reps)                                    # (768,)
+        if self.mu_head is not None and self.projector is not None:
+            # IB head is on-path at fine-tune: μ (deterministic at eval),
+            # then projector back to 768.
+            partial = self.projector(self.mu_head(partial))
+        return partial
+
+    def forward(self, paragraphs_batch: list) -> torch.Tensor:
+        """Returns logits (B, num_labels) = temperature · cosine(doc_rep, prototype)."""
+        doc_reps = torch.stack([self._doc_rep(paras) for paras in paragraphs_batch])  # (B, 768)
+        doc_n    = F.normalize(doc_reps,        dim=-1)
+        proto_n  = F.normalize(self.prototypes, dim=-1)
+        temp     = self.log_temperature.exp()
+        return temp * (doc_n @ proto_n.T)                                              # (B, num_labels)
