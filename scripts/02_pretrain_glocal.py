@@ -293,6 +293,11 @@ def train():
     eff_rank_z      = 0.0
     eff_rank_mu     = 0.0
     infonce_lb      = 0.0
+    # Parallel rolling buffer for the InfoNCE diagnostic: we pair Z_proj (post-
+    # bottleneck) with z_partial (pre-bottleneck) — both 768-D — and compute
+    # I(Z_proj; z_partial) lower bound. If the IB is actually compressing,
+    # this bound should DROP relative to a no-bottleneck baseline.
+    z_partial_diag_buffer = deque(maxlen=Z_BUFFER_LEN)
     t_train_start  = time.time()
 
     for epoch in range(EPOCHS):
@@ -412,8 +417,10 @@ def train():
                 avg_step = sum(step_times) / len(step_times)
                 eta_sec  = avg_step * max(0, total_steps - global_step)
 
-                # Maintain rolling buffer of post-predictor Z_proj (already in out[1])
+                # Maintain rolling buffers of post-predictor Z_proj (out[1]) and
+                # pre-bottleneck z_partial (out[9]) for the InfoNCE I(Z;X) bound.
                 z_proj_buffer.append(out[1].detach().float().cpu().mean(0))
+                z_partial_diag_buffer.append(out[9].detach().float().cpu().mean(0))
 
                 if accelerator.is_main_process:
                     log_s         = out[7].detach().float()
@@ -431,17 +438,16 @@ def train():
 
                     if global_step % COLLAPSE_LOG_EVERY == 0:
                         collapse_metric = mean_pairwise_cosine(z_proj_buffer)
-                        # P-A-01: effective-rank + InfoNCE I(Z;X) lower bound. Both
-                        # are cheap and bounded by the in-batch sample count (B≥4
-                        # required for a non-trivial bound; the rolling Z buffer
-                        # gives us K=Z_BUFFER_LEN samples to work with).
-                        if len(z_proj_buffer) >= 4:
-                            z_buf_tensor = torch.stack(list(z_proj_buffer))
+                        # P-A-01: effective rank on Z and μ; InfoNCE I(Z_proj; z_partial)
+                        # lower bound (both 768-D, paired from the same step).
+                        # If the IB is compressing this bound should drop vs a
+                        # no-bottleneck baseline.
+                        if (len(z_proj_buffer) >= 4
+                                and len(z_partial_diag_buffer) == len(z_proj_buffer)):
+                            z_buf_tensor  = torch.stack(list(z_proj_buffer))           # (K, 768)
+                            zp_buf_tensor = torch.stack(list(z_partial_diag_buffer))   # (K, 768)
                             eff_rank_z = effective_rank(z_buf_tensor)
-                            # Pseudo-X side: same buffer as a stand-in for the
-                            # post-encoder representation. For a stricter test
-                            # use z_partial.detach().cpu() per-step.
-                            _, infonce_lb = infonce_lower_bound(z_buf_tensor, z_buf_tensor)
+                            _, infonce_lb = infonce_lower_bound(z_buf_tensor, zp_buf_tensor)
                         else:
                             eff_rank_z = 0.0
                             infonce_lb = 0.0
