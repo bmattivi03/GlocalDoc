@@ -16,3 +16,9 @@ wandb/
 # Keep untracked so we never accidentally commit gigabytes of checkpoints.
 GlocalDoc_trained/
 
+# Research swarm infrastructure + run outputs. The orchestrator and 81 persona
+# YAMLs that produced the V2 blueprint live here (see swarm/README.md), along
+# with per-run prompt/response logs that can be hundreds of MB. Kept local;
+# the blueprint itself was distilled into the V2 code on this branch.
+swarm/
+
