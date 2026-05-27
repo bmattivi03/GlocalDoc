@@ -22,3 +22,8 @@ GlocalDoc_trained/
 # the blueprint itself was distilled into the V2 code on this branch.
 swarm/
 
+# Local-only Claude Code overrides — currently arms the auto-memory-on-commit
+# hook in .claude/hooks/update-memory-on-commit.sh. The script itself is
+# committed; the toggle file is not (each clone opts in).
+.claude/settings.local.json
+
