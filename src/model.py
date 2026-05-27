@@ -101,13 +101,16 @@ class GlocalIBModel(nn.Module):
 
         # P-B-04: DINO-style teacher centering. Running mean of teacher
         # full-doc outputs, subtracted from Z_prime before alignment so the
-        # teacher cannot collapse to a single output (which would let the
-        # student trivially satisfy L_global by becoming constant). EMA
-        # momentum 0.9 — fast enough to track distribution drift, slow
-        # enough to smooth per-batch noise.
+        # teacher cannot collapse to a single output. EMA momentum 0.9.
+        # Accumulation: forward adds the batch-mean (×B) into _pending_center_sum
+        # and increments _pending_center_count; update_teacher_ema divides
+        # and applies EMA, then resets. Under GRAD_ACCUM > 1 this ensures all
+        # micro-batches in the optimizer step contribute, not just the last
+        # (the bug a code review caught at glocaldoc-v2:670ae21).
         self.register_buffer("teacher_center", torch.zeros(768))
         self.center_momentum = 0.9
-        self._pending_center_update = None   # set inside forward, consumed in update_teacher_ema
+        self.register_buffer("_pending_center_sum", torch.zeros(768))
+        self.register_buffer("_pending_center_count", torch.zeros(1))
 
         self.ema_tau        = ema_tau
         self.max_paragraphs = max_paragraphs
@@ -222,13 +225,16 @@ class GlocalIBModel(nn.Module):
                 self.attn_pool_student.parameters(),
             ):
                 p_t.data.mul_(self.ema_tau).add_(p_s.data, alpha=1.0 - self.ema_tau)
-            # P-B-04: teacher centering. Consume the pending batch-mean
-            # cached during forward; apply EMA with center_momentum.
-            if self._pending_center_update is not None:
+            # P-B-04: teacher centering. Consume the accumulated sum + count
+            # across all micro-batches in this optimizer step (GRAD_ACCUM > 1
+            # otherwise only the last micro-batch's mean would land in the EMA).
+            if self._pending_center_count.item() > 0:
+                batch_mean = self._pending_center_sum / self._pending_center_count.item()
                 self.teacher_center.mul_(self.center_momentum).add_(
-                    self._pending_center_update, alpha=1.0 - self.center_momentum
+                    batch_mean, alpha=1.0 - self.center_momentum
                 )
-                self._pending_center_update = None
+                self._pending_center_sum.zero_()
+                self._pending_center_count.zero_()
 
     # ------------------------------------------------------------------
     # Forward pass
@@ -305,12 +311,17 @@ class GlocalIBModel(nn.Module):
 
         log_s = torch.clamp(self.log_s, min=-10, max=10)
 
-        # P-B-04: DINO-style centering. Cache batch mean for the next EMA update;
-        # subtract running center from Z_prime so the teacher cannot trivially
-        # collapse to a single output. No gradient through the center.
+        # P-B-04: DINO-style centering. Accumulate (sum, count) into the
+        # pending buffers — every micro-batch in this optimizer step contributes
+        # to the EMA that runs in update_teacher_ema(). Subtract the *current*
+        # running center (not the post-EMA value) from Z_prime so the teacher
+        # cannot trivially collapse to a single output.
         Z_prime_stacked = torch.stack(Z_prime_list)
         with torch.no_grad():
-            self._pending_center_update = Z_prime_stacked.mean(dim=0).detach()
+            batch_sum = Z_prime_stacked.detach().sum(dim=0)
+            batch_n   = float(Z_prime_stacked.shape[0])
+            self._pending_center_sum.add_(batch_sum)
+            self._pending_center_count.add_(batch_n)
             Z_prime_centered = Z_prime_stacked - self.teacher_center.unsqueeze(0)
 
         return (
