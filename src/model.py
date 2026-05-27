@@ -245,10 +245,14 @@ class GlocalIBModel(nn.Module):
         full_batch:         list,   # list[list[str]] — clean paragraphs (X0)
         masked_batch:       list,   # list[list[str]] — word/sentence masked (Xm)
         kept_indices_batch: list,   # list[list[int]] — M kept indices per doc
+        compute_mlm: bool = True,
     ):
-        """
-        Returns 10-tuple. Loss code consumes indices 0–7; indices 8–9 are for
-        logging only (raw pre-predictor vectors to diagnose predictor health).
+        """Returns 11-tuple. The MLM term is now computed inside forward so
+        DDP's gradient reducer collects its gradients (V2.1 fix; the V2
+        train loop previously called compute_mlm_loss via unwrap_model which
+        bypasses the DDP wrapper). Loss code consumes indices 0–7; index 10 is
+        the L_mlm term (caller adds it outside UW). Indices 8–9 are for
+        logging only.
 
           0  Z_prime_centered (B, 768)        teacher full-doc repr with DINO centering applied (stop-grad)
           1  Z_proj_pred     (B, 768)         student post-IB, post-predictor (for L_global)
@@ -260,6 +264,7 @@ class GlocalIBModel(nn.Module):
           7  log_s           (3,)             UW weights [local, inter, global] (clamped)
           8  Z_proj          (B, 768)         student post-IB pre-predictor (logging only)
           9  z_partial       (B, 768)         student pre-IB pre-predictor (logging only)
+         10  l_mlm           ()               per-paragraph token MLM loss (zero if compute_mlm=False)
         """
         Z_prime_list        = []
         Z_proj_pred_list    = []
@@ -324,6 +329,14 @@ class GlocalIBModel(nn.Module):
             self._pending_center_count.add_(batch_n)
             Z_prime_centered = Z_prime_stacked - self.teacher_center.unsqueeze(0)
 
+        # P-C-01 + I2: per-paragraph token MLM loss inline inside forward so
+        # the DDP wrapper sees its gradient (calling compute_mlm_loss via
+        # unwrap_model in the train loop bypassed the reducer hooks).
+        if compute_mlm:
+            l_mlm = self.compute_mlm_loss(full_batch)
+        else:
+            l_mlm = Z_prime_centered.new_zeros(())
+
         return (
             Z_prime_centered,                  # 0 (B, 768) — center-subtracted
             torch.stack(Z_proj_pred_list),     # 1 (B, 768)
@@ -335,6 +348,7 @@ class GlocalIBModel(nn.Module):
             log_s,                             # 7 (3,)
             torch.stack(Z_proj_list),          # 8 (B, 768)  logging only
             torch.stack(z_partial_list),       # 9 (B, 768)  logging only
+            l_mlm,                             # 10 () — token MLM
         )
 
 

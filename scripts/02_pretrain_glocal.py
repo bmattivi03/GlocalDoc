@@ -331,7 +331,9 @@ def train():
 
             with accelerator.accumulate(model):
                 out = model(full_batch, masked_batch, kept_indices_batch)
-                # Loss consumes indices 0–7; indices 8–9 are for logging only.
+                # V2.1: forward returns 11-tuple. Loss code consumes 0–7;
+                # 8–9 logging-only; 10 is l_mlm (computed inside the DDP-wrapped
+                # forward so gradients all-reduce correctly).
                 total, lc, ll, li, lg, lvar, lcov = glocal_ib_loss(
                     *out[:8],
                     beta_kl=beta_kl,
@@ -340,6 +342,7 @@ def train():
                     cov_weight=COV_WEIGHT,
                     var_gamma=VAR_GAMMA,
                 )
+                l_mlm = out[10]
 
                 # Temporal anti-collapse on Z_proj_pred (out[1]) and mu (out[5]).
                 # Concatenate the current with-gradient sample with detached past
@@ -362,11 +365,10 @@ def train():
                     l_var_m = variance_loss(mu_all, gamma=VAR_GAMMA)
                     l_cov_m = covariance_loss(mu_all)
 
-                # P-C-01: per-paragraph token MLM loss outside UW. This is the
-                # supervision-density-matched signal that closes the V1 30× gap to
-                # H-MLM. Carries gradient through encoder + lm_head.
-                l_mlm = accelerator.unwrap_model(model).compute_mlm_loss(full_batch)
-
+                # P-C-01: per-paragraph token MLM loss outside UW. l_mlm came
+                # from out[10], computed *inside* the DDP-wrapped forward
+                # (so its gradients all-reduce; the V2.0 unwrap_model path
+                # bypassed the reducer on multi-GPU).
                 total = total \
                       + Z_PROJ_VAR_WEIGHT * l_var_z \
                       + Z_PROJ_COV_WEIGHT * l_cov_z \
