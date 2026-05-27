@@ -446,20 +446,34 @@ class ProtoClassifier(nn.Module):
 
         # Initialize prototypes by encoding label texts through the same
         # representation path the documents will be encoded through.
-        with torch.no_grad():
-            proto_init = []
-            for txt in label_texts:
-                enc = tokenizer(
-                    txt, return_tensors="pt", truncation=True, max_length=64
-                ).to(device)
-                # Encoder body output → take CLS → IB head → projector
-                cls_vec = encoder(**enc).last_hidden_state[:, 0, :]   # (1, 768)
-                if mu_head is not None and projector is not None:
-                    rep = projector(mu_head(cls_vec)).squeeze(0)
-                else:
-                    rep = cls_vec.squeeze(0)
-                proto_init.append(rep)
-        self.prototypes = nn.Parameter(torch.stack(proto_init))    # (num_labels, 768)
+        # Force eval() during init so dropout is OFF — otherwise prototype
+        # init varies with whatever mode the encoder happened to be in.
+        prior_modes = {
+            "encoder": encoder.training,
+            "mu_head": mu_head.training if mu_head is not None else None,
+            "projector": projector.training if projector is not None else None,
+        }
+        encoder.eval()
+        if mu_head is not None: mu_head.eval()
+        if projector is not None: projector.eval()
+        try:
+            with torch.no_grad():
+                proto_init = []
+                for txt in label_texts:
+                    enc = tokenizer(
+                        txt, return_tensors="pt", truncation=True, max_length=64
+                    ).to(device)
+                    cls_vec = encoder(**enc).last_hidden_state[:, 0, :]   # (1, 768)
+                    if mu_head is not None and projector is not None:
+                        rep = projector(mu_head(cls_vec)).squeeze(0)
+                    else:
+                        rep = cls_vec.squeeze(0)
+                    proto_init.append(rep)
+            self.prototypes = nn.Parameter(torch.stack(proto_init))    # (num_labels, 768)
+        finally:
+            encoder.train(prior_modes["encoder"])
+            if mu_head is not None: mu_head.train(prior_modes["mu_head"])
+            if projector is not None: projector.train(prior_modes["projector"])
         self.to(device)
 
     @property
