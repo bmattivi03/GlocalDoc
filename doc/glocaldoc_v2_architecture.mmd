@@ -1,0 +1,63 @@
+flowchart TD
+    subgraph TCOL["Teacher (EMA, frozen)"]
+      direction TB
+      TIN["Clean paragraphs P<br/>N strings"]
+      TENC["DistilRoBERTa teacher<br/>separate EMA copy"]
+      TCLS["H_T : N x 768<br/>CLS per paragraph"]
+      TPL["AttentionPooling teacher<br/>EMA-updated"]
+      TZP["Z' : 768<br/>full-doc teacher repr"]
+      TCTR["DINO centering P-B-04<br/>Z' ← Z' − c"]
+      TIN --> TENC --> TCLS --> TPL --> TZP --> TCTR
+    end
+
+    subgraph SCOL["Student (trainable)"]
+      direction TB
+      SIN["Masked paragraphs Pm<br/>sentence drop 20% + span 15%"]
+      SENC["RobertaForMaskedLM student<br/>body + LM head P-C-01"]
+      SMLM["LM head<br/>15% token mask · CE"]
+      SCLS["H_S : N x 768<br/>CLS per paragraph"]
+      SDR["Paragraph Dropout 30%<br/>keep M&lt;N"]
+      SPL["AttentionPooling student<br/>trainable"]
+      SZPT["z_partial : 768"]
+      SIB["IB Bottleneck P-G-01<br/>mu, log sigma : 256<br/>z = mu + sigma·eps<br/>free-bits lambda=0.05"]
+      SPROJ["MLP Projector<br/>256 to 512 to 768"]
+      SZPJ["Z_proj : 768"]
+      SPREDG["Predictor MLP student-only<br/>768 to 512 to 768"]
+      SZPJP["Z_proj_pred : 768"]
+      SPREDI["Predictor MLP student-only<br/>768 to 512 to 768"]
+      SZPTP["z_partial_pred : 768"]
+      SIN --> SENC
+      SENC --> SMLM
+      SENC --> SCLS --> SDR --> SPL --> SZPT
+      SZPT --> SIB --> SPROJ --> SZPJ --> SPREDG --> SZPJP
+      SZPT --> SPREDI --> SZPTP
+    end
+
+    LLOC(["L_local<br/>cosine · all N pairs · in UW"]):::lossin
+    LINT(["L_inter<br/>partial vs full · in UW"]):::lossin
+    LGLB(["L_global<br/>post-IB vs full · in UW"]):::lossin
+    LCOM(["L_compress P-G-02<br/>KL · fixed β · OUTSIDE UW"]):::lossout
+    LMLM(["L_mlm P-C-01<br/>per-paragraph token CE<br/>fixed wt · OUTSIDE UW"]):::lossout
+
+    TCLS -.->|teacher CLS| LLOC
+    SCLS -.->|student CLS| LLOC
+    TZP -.->|teacher full| LINT
+    SZPTP -.->|predictor| LINT
+    TCTR -.->|centered teacher| LGLB
+    SZPJP -.->|predictor| LGLB
+    SIB -.-> LCOM
+    SMLM -.-> LMLM
+
+    SENC -.->|"EMA tau:0.996 to 0.9999 P-G-04"| TENC
+    SPL -.->|EMA pool| TPL
+
+    TOTAL["TOTAL LOSS V2<br/>UW over 3 alignment losses + fixed β·L_compress + fixed w·L_mlm + VICReg/temporal"]:::total
+    LLOC --> TOTAL
+    LINT --> TOTAL
+    LGLB --> TOTAL
+    LCOM --> TOTAL
+    LMLM --> TOTAL
+
+    classDef lossin fill:#fde2e2,stroke:#c62828,color:#7a1f1f
+    classDef lossout fill:#fff2cc,stroke:#b87333,color:#5b3c11
+    classDef total fill:#f3edda,stroke:#7a5230,color:#3d2814

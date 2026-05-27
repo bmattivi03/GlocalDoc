@@ -1,0 +1,233 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1102.7490833333334 2193.9000000000005" width="1102.7490833333334" height="2193.9000000000005" style="--bg:#f5f5f5;--fg:#333333;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<g class="subgraph" data-id="TCOL" data-label="Teacher (EMA, frozen)">
+  <rect x="46.82741666666678" y="1259.2" width="368.88083333333327" height="622.8000000000001" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="46.82741666666678" y="1259.2" width="368.88083333333327" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="58.82741666666678" y="1273.2" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Teacher (EMA, frozen)</text>
+</g>
+<g class="subgraph" data-id="SCOL" data-label="Student (trainable)">
+  <rect x="299.0195833333334" y="40" width="733.8700833333332" height="1114.9" rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <rect x="299.0195833333334" y="40" width="733.8700833333332" height="28" rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="1" />
+  <text x="311.0195833333334" y="54" font-size="12" font-weight="600" fill="var(--_text-sec)" dy="4.199999999999999">Student (trainable)</text>
+</g>
+<polyline class="edge" data-from="LLOC" data-to="TOTAL" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="832.5901666666666,2064.1000000000004 832.5901666666666,2082.1000000000004 668.4764166666666,2082.1000000000004 668.4764166666666,2100.1000000000004" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="LINT" data-to="TOTAL" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="465.90591666666666,2064.1000000000004 465.90591666666666,2082.1000000000004 668.4764166666666,2082.1000000000004 668.4764166666666,2100.1000000000004" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="LGLB" data-to="TOTAL" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="154.48366666666666,2064.1000000000004 154.48366666666666,2082.1000000000004 668.4764166666666,2082.1000000000004 668.4764166666666,2100.1000000000004" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="LCOM" data-to="TOTAL" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="582.0260000000001,1950.3000000000002 582.0260000000001,2082.1000000000004 668.4764166666666,2082.1000000000004 668.4764166666666,2100.1000000000004" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="LMLM" data-to="TOTAL" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="970.2675833333334,1882.0000000000002 970.2675833333334,2082.1000000000004 668.4764166666666,2082.1000000000004 668.4764166666666,2100.1000000000004" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="TCLS" data-to="LLOC" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="teacher CLS" points="300.0834166666667,1560.6000000000001 300.0834166666667,1882 300.0834166666668,1918.0000000000002 363.0738333333334,1918.0000000000002 363.0738333333334,1962.3000000000002 799.9105,1962.3000000000002 799.9105,2010.3000000000002" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SCLS" data-to="LLOC" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="student CLS" points="687.8120416666667,341.40000000000003 687.8120416666667,353.40000000000003 850.8610000000001,353.40000000000003 850.8610000000001,1154.9 850.8610000000001,1918.0000000000002 866.7860833333334,1918.0000000000002 866.7860833333334,1986.3000000000002 865.2698333333333,1986.3000000000002 865.2698333333333,2010.3000000000002" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="TZP" data-to="LINT" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="teacher full" points="128.4337500000001,1764.2 128.4337500000001,1776.2 106.71741666666676,1776.2 106.71741666666676,1882 106.71741666666676,1918.0000000000002 111.14491666666677,1918.0000000000002 111.14491666666677,1986.3000000000002 439.40125,1986.3000000000002 439.40125,2010.3000000000002" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SZPTP" data-to="LINT" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="predictor" points="739.117,854.6250000000001 739.117,1154.9 739.117,1816.2000000000003 715.5172499999999,1816.2000000000003 715.5172499999999,1986.3000000000002 492.4105833333333,1986.3000000000002 492.4105833333333,2010.3000000000002" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="TCTR" data-to="LGLB" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="centered teacher" points="203.90041666666676,1866 203.90041666666676,1882 203.90041666666676,1962.3000000000002 127.36149999999999,1962.3000000000002 127.36149999999999,2010.3000000000002" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SZPJP" data-to="LGLB" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="predictor" points="470.28200000000004,1138.9 470.28200000000004,1154.9 470.28200000000004,1816.2000000000003 470.7082500000001,1816.2000000000003 470.7082500000001,1974.3000000000002 181.60583333333335,1974.3000000000002 181.60583333333335,2010.3000000000002" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SIB" data-to="LCOM" data-style="dotted" data-arrow-start="false" data-arrow-end="true" points="553.8936666666667,773.9500000000002 553.8936666666667,777.5000000000001 582.0260000000001,777.5000000000001 582.0260000000001,1154.9 582.0260000000001,1896.5000000000002" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SMLM" data-to="LMLM" data-style="dotted" data-arrow-start="false" data-arrow-end="true" points="937.3756666666666,341.40000000000003 937.3756666666668,1154.9 937.3756666666668,1799.3000000000002 970.2675833333333,1799.3000000000002 970.2675833333334,1811.3000000000002" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SENC" data-to="TENC" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="EMA tau:0.996 to 0.9999 P-G-04" points="577.1880000000001,239.60000000000002 577.1880000000001,251.60000000000002 315.0195833333334,251.60000000000002 315.0195833333334,1154.9 315.0195833333334,1166.9 118,1166.9 118,1235.2 228.19825000000006,1235.2 228.19825000000006,1259.2 228.19825000000006,1369 244.23358333333343,1369 244.2335833333334,1405" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SPL" data-to="TPL" data-style="dotted" data-arrow-start="false" data-arrow-end="true" data-label="EMA pool" points="549.8942916666666,545 549.8942916666666,557 357.53800000000007,557 357.53800000000007,1154.9 357.53800000000007,1178.9 234.68000000000006,1178.9 234.68000000000006,1223.2 176.3400000000001,1223.2 176.3400000000001,1247.2 124.48175000000009,1247.2 124.48175000000009,1259.2 124.48175000000009,1608.6000000000001" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="TIN" data-to="TENC" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="319.45325,1357 319.45325,1369 303.41791666666677,1369 303.41791666666677,1405" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="TENC" data-to="TCLS" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="273.8257500000001,1458.8000000000002 273.8257500000001,1506.8000000000002" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="TCLS" data-to="TPL" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="247.56808333333342,1560.6000000000001 247.56808333333342,1572.6000000000001 186.1360833333334,1572.6000000000001 186.1360833333334,1608.6000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="TPL" data-to="TZP" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="155.30891666666676,1662.4 155.30891666666676,1710.4" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="TZP" data-to="TCTR" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="182.18408333333343,1764.2 182.18408333333343,1776.2 203.90041666666676,1776.2 203.90041666666676,1812.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SIN" data-to="SENC" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="633.4322500000001,137.8 633.4322500000001,185.8" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SENC" data-to="SMLM" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="689.6765,239.60000000000002 689.6765,251.60000000000002 937.3756666666668,251.60000000000002 937.3756666666666,287.6" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SENC" data-to="SCLS" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="633.4322500000001,239.60000000000002 633.4322500000001,251.60000000000002 661.554375,251.60000000000002 661.5543749999999,287.6" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SCLS" data-to="SDR" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="635.2967083333333,341.40000000000003 635.2967083333333,353.40000000000003 580.2274583333333,353.40000000000003 580.2274583333333,389.40000000000003" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SDR" data-to="SPL" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="580.2274583333333,443.20000000000005 580.2274583333333,491.20000000000005" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SPL" data-to="SZPT" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="610.560625,545 610.560625,557 645.0256666666667,557 645.0256666666667,593" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SZPT" data-to="SIB" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="645.0256666666667,629.9 645.0256666666667,658.125 526.154,658.125 526.154,686.3500000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SIB" data-to="SPROJ" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="498.4143333333334,773.9500000000002 498.4143333333334,777.5000000000001 470.28200000000004,777.5000000000001 470.28200000000004,817.7250000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SPROJ" data-to="SZPJ" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="470.28200000000004,871.5250000000001 470.28200000000004,915.3000000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SZPJ" data-to="SPREDG" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="470.28200000000004,952.2 470.28200000000004,1000.2" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SPREDG" data-to="SZPJP" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="470.28200000000004,1054 470.28200000000004,1102" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SZPT" data-to="SPREDI" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="645.0256666666667,629.9 645.0256666666667,658.125 739.1170000000001,658.125 739.1170000000001,686.3500000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="SPREDI" data-to="SZPTP" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="739.117,740.1500000000001 739.117,817.7250000000001" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="TCLS" data-to="LLOC" data-label="teacher CLS">
+  <rect x="324.0738333333334" y="1925.0000000000002" width="77.644" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="362.8958333333334" y="1940.1500000000003" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">teacher CLS</text>
+</g>
+<g class="edge-label" data-from="SCLS" data-to="LLOC" data-label="student CLS">
+  <rect x="828.7860833333334" y="1925.0000000000002" width="75.268" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="866.4200833333334" y="1940.1500000000003" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">student CLS</text>
+</g>
+<g class="edge-label" data-from="TZP" data-to="LINT" data-label="teacher full">
+  <rect x="76.14491666666677" y="1925.0000000000002" width="69.328" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="110.80891666666678" y="1940.1500000000003" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">teacher full</text>
+</g>
+<g class="edge-label" data-from="SZPTP" data-to="LINT" data-label="predictor">
+  <rect x="684.5172500000001" y="1823.2000000000003" width="61.606" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="715.3202500000001" y="1838.3500000000004" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">predictor</text>
+</g>
+<g class="edge-label" data-from="TCTR" data-to="LGLB" data-label="centered teacher">
+  <rect x="153.90041666666676" y="1925.0000000000002" width="99.02800000000002" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="203.41441666666677" y="1940.1500000000003" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">centered teacher</text>
+</g>
+<g class="edge-label" data-from="SZPJP" data-to="LGLB" data-label="predictor">
+  <rect x="439.7082500000001" y="1823.2000000000003" width="61.606" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="470.5112500000001" y="1838.3500000000004" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">predictor</text>
+</g>
+<g class="edge-label" data-from="SENC" data-to="TENC" data-label="EMA tau:0.996 to 0.9999 P-G-04">
+  <rect x="36" y="1185.9" width="163.18000000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="117.59000000000002" y="1201.0500000000002" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">EMA tau:0.996 to 0.9999 P-G-04</text>
+</g>
+<g class="edge-label" data-from="SPL" data-to="TPL" data-label="EMA pool">
+  <rect x="203.18000000000006" y="1185.9" width="62.794000000000004" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="234.57700000000006" y="1201.0500000000002" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">EMA pool</text>
+</g>
+<g class="node" data-id="LLOC" data-label="L_local
+cosine · all N pairs · in UW" data-shape="stadium">
+  <rect x="734.5511666666666" y="2010.3000000000002" width="196.078" height="53.800000000000004" rx="26.900000000000002" ry="26.900000000000002" fill="#fde2e2" stroke="#c62828" stroke-width="0.75" />
+  <text x="832.5901666666666" y="2037.2000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="#7a1f1f"><tspan x="832.5901666666666" dy="-3.9000000000000012">L_local</tspan><tspan x="832.5901666666666" dy="16.900000000000002">cosine · all N pairs · in UW</tspan></text>
+</g>
+<g class="node" data-id="LINT" data-label="L_inter
+partial vs full · in UW" data-shape="stadium">
+  <rect x="386.39191666666665" y="2010.3000000000002" width="159.02800000000002" height="53.800000000000004" rx="26.900000000000002" ry="26.900000000000002" fill="#fde2e2" stroke="#c62828" stroke-width="0.75" />
+  <text x="465.90591666666666" y="2037.2000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="#7a1f1f"><tspan x="465.90591666666666" dy="-3.9000000000000012">L_inter</tspan><tspan x="465.90591666666666" dy="16.900000000000002">partial vs full · in UW</tspan></text>
+</g>
+<g class="node" data-id="LGLB" data-label="L_global
+post-IB vs full · in UW" data-shape="stadium">
+  <rect x="73.11716666666665" y="2010.3000000000002" width="162.73300000000003" height="53.800000000000004" rx="26.900000000000002" ry="26.900000000000002" fill="#fde2e2" stroke="#c62828" stroke-width="0.75" />
+  <text x="154.48366666666666" y="2037.2000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="#7a1f1f"><tspan x="154.48366666666666" dy="-3.9000000000000012">L_global</tspan><tspan x="154.48366666666666" dy="16.900000000000002">post-IB vs full · in UW</tspan></text>
+</g>
+<g class="node" data-id="LCOM" data-label="L_compress P-G-02
+KL · fixed β · OUTSIDE UW" data-shape="stadium">
+  <rect x="482.13450000000006" y="1896.5000000000002" width="199.78299999999996" height="53.800000000000004" rx="26.900000000000002" ry="26.900000000000002" fill="#fff2cc" stroke="#b87333" stroke-width="0.75" />
+  <text x="582.0260000000001" y="1923.4000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="#5b3c11"><tspan x="582.0260000000001" dy="-3.9000000000000012">L_compress P-G-02</tspan><tspan x="582.0260000000001" dy="16.900000000000002">KL · fixed β · OUTSIDE UW</tspan></text>
+</g>
+<g class="node" data-id="LMLM" data-label="L_mlm P-C-01
+per-paragraph token CE
+fixed wt · OUTSIDE UW" data-shape="stadium">
+  <rect x="877.7860833333334" y="1811.3000000000002" width="184.96299999999997" height="70.7" rx="35.35" ry="35.35" fill="#fff2cc" stroke="#b87333" stroke-width="0.75" />
+  <text x="970.2675833333334" y="1846.65" text-anchor="middle" font-size="13" font-weight="500" fill="#5b3c11"><tspan x="970.2675833333334" dy="-12.350000000000001">L_mlm P-C-01</tspan><tspan x="970.2675833333334" dy="16.900000000000002">per-paragraph token CE</tspan><tspan x="970.2675833333334" dy="16.900000000000002">fixed wt · OUTSIDE UW</tspan></text>
+</g>
+<g class="node" data-id="TOTAL" data-label="TOTAL LOSS V2
+UW over 3 alignment losses + fixed β·L_compress + fixed w·L_mlm + VICReg/temporal" data-shape="rectangle">
+  <rect x="398.5254166666666" y="2100.1000000000004" width="539.902" height="53.800000000000004" rx="0" ry="0" fill="#f3edda" stroke="#7a5230" stroke-width="0.75" />
+  <text x="668.4764166666666" y="2127.0000000000005" text-anchor="middle" font-size="13" font-weight="500" fill="#3d2814"><tspan x="668.4764166666666" dy="-3.9000000000000012">TOTAL LOSS V2</tspan><tspan x="668.4764166666666" dy="16.900000000000002">UW over 3 alignment losses + fixed β·L_compress + fixed w·L_mlm + VICReg/temporal</tspan></text>
+</g>
+<g class="node" data-id="TIN" data-label="Clean paragraphs P
+N strings" data-shape="rectangle">
+  <rect x="239.19825000000006" y="1303.2" width="160.51" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="319.45325" y="1330.1000000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="319.45325" dy="-3.9000000000000012">Clean paragraphs P</tspan><tspan x="319.45325" dy="16.900000000000002">N strings</tspan></text>
+</g>
+<g class="node" data-id="TENC" data-label="DistilRoBERTa teacher
+separate EMA copy" data-shape="rectangle">
+  <rect x="185.0492500000001" y="1405" width="177.55299999999997" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="273.8257500000001" y="1431.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="273.8257500000001" dy="-3.9000000000000012">DistilRoBERTa teacher</tspan><tspan x="273.8257500000001" dy="16.900000000000002">separate EMA copy</tspan></text>
+</g>
+<g class="node" data-id="TCLS" data-label="H_T : N x 768
+CLS per paragraph" data-shape="rectangle">
+  <rect x="195.0527500000001" y="1506.8000000000002" width="157.546" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="273.8257500000001" y="1533.7000000000003" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="273.8257500000001" dy="-3.9000000000000012">H_T : N x 768</tspan><tspan x="273.8257500000001" dy="16.900000000000002">CLS per paragraph</tspan></text>
+</g>
+<g class="node" data-id="TPL" data-label="AttentionPooling teacher
+EMA-updated" data-shape="rectangle">
+  <rect x="62.82741666666678" y="1608.6000000000001" width="184.96299999999997" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="155.30891666666676" y="1635.5000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="155.30891666666676" dy="-3.9000000000000012">AttentionPooling teacher</tspan><tspan x="155.30891666666676" dy="16.900000000000002">EMA-updated</tspan></text>
+</g>
+<g class="node" data-id="TZP" data-label="Z' : 768
+full-doc teacher repr" data-shape="rectangle">
+  <rect x="74.68341666666676" y="1710.4" width="161.251" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="155.30891666666676" y="1737.3000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="155.30891666666676" dy="-3.9000000000000012">Z&#39; : 768</tspan><tspan x="155.30891666666676" dy="16.900000000000002">full-doc teacher repr</tspan></text>
+</g>
+<g class="node" data-id="TCTR" data-label="DINO centering P-B-04
+Z' ← Z' − c" data-shape="rectangle">
+  <rect x="117.71741666666676" y="1812.2" width="172.36599999999999" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="203.90041666666676" y="1839.1000000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="203.90041666666676" dy="-3.9000000000000012">DINO centering P-B-04</tspan><tspan x="203.90041666666676" dy="16.900000000000002">Z&#39; ← Z&#39; − c</tspan></text>
+</g>
+<g class="node" data-id="SIN" data-label="Masked paragraphs Pm
+sentence drop 20% + span 15%" data-shape="rectangle">
+  <rect x="525.38975" y="84" width="216.08499999999998" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="633.4322500000001" y="110.9" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="633.4322500000001" dy="-3.9000000000000012">Masked paragraphs Pm</tspan><tspan x="633.4322500000001" dy="16.900000000000002">sentence drop 20% + span 15%</tspan></text>
+</g>
+<g class="node" data-id="SENC" data-label="RobertaForMaskedLM student
+body + LM head P-C-01" data-shape="rectangle">
+  <rect x="520.94375" y="185.8" width="224.97699999999995" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="633.43225" y="212.70000000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="633.43225" dy="-3.9000000000000012">RobertaForMaskedLM student</tspan><tspan x="633.43225" dy="16.900000000000002">body + LM head P-C-01</tspan></text>
+</g>
+<g class="node" data-id="SMLM" data-label="LM head
+15% token mask · CE" data-shape="rectangle">
+  <rect x="857.8616666666667" y="287.6" width="159.02799999999996" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="937.3756666666667" y="314.5" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="937.3756666666667" dy="-3.9000000000000012">LM head</tspan><tspan x="937.3756666666667" dy="16.900000000000002">15% token mask · CE</tspan></text>
+</g>
+<g class="node" data-id="SCLS" data-label="H_S : N x 768
+CLS per paragraph" data-shape="rectangle">
+  <rect x="582.781375" y="287.6" width="157.546" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="661.554375" y="314.5" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="661.554375" dy="-3.9000000000000012">H_S : N x 768</tspan><tspan x="661.554375" dy="16.900000000000002">CLS per paragraph</tspan></text>
+</g>
+<g class="node" data-id="SDR" data-label="Paragraph Dropout 30%
+keep M&lt;N" data-shape="rectangle">
+  <rect x="488.85745833333334" y="389.40000000000003" width="182.74" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="580.2274583333333" y="416.3" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="580.2274583333333" dy="-3.9000000000000012">Paragraph Dropout 30%</tspan><tspan x="580.2274583333333" dy="16.900000000000002">keep M&lt;N</tspan></text>
+</g>
+<g class="node" data-id="SPL" data-label="AttentionPooling student
+trainable" data-shape="rectangle">
+  <rect x="489.22795833333333" y="491.20000000000005" width="181.99899999999997" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="580.2274583333333" y="518.1" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="580.2274583333333" dy="-3.9000000000000012">AttentionPooling student</tspan><tspan x="580.2274583333333" dy="16.900000000000002">trainable</tspan></text>
+</g>
+<g class="node" data-id="SZPT" data-label="z_partial : 768" data-shape="rectangle">
+  <rect x="583.2956666666666" y="593" width="123.46000000000001" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="645.0256666666667" y="611.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">z_partial : 768</text>
+</g>
+<g class="node" data-id="SIB" data-label="IB Bottleneck P-G-01
+mu, log sigma : 256
+z = mu + sigma·eps
+free-bits lambda=0.05" data-shape="rectangle">
+  <rect x="442.93500000000006" y="686.3500000000001" width="166.438" height="87.60000000000001" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="526.154" y="730.1500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="526.154" dy="-20.8">IB Bottleneck P-G-01</tspan><tspan x="526.154" dy="16.900000000000002">mu, log sigma : 256</tspan><tspan x="526.154" dy="16.900000000000002">z = mu + sigma·eps</tspan><tspan x="526.154" dy="16.900000000000002">free-bits lambda=0.05</tspan></text>
+</g>
+<g class="node" data-id="SPROJ" data-label="MLP Projector
+256 to 512 to 768" data-shape="rectangle">
+  <rect x="403.36500000000007" y="817.7250000000001" width="133.834" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="470.28200000000004" y="844.6250000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="470.28200000000004" dy="-3.9000000000000012">MLP Projector</tspan><tspan x="470.28200000000004" dy="16.900000000000002">256 to 512 to 768</tspan></text>
+</g>
+<g class="node" data-id="SZPJ" data-label="Z_proj : 768" data-shape="rectangle">
+  <rect x="414.4800000000001" y="915.3000000000001" width="111.604" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="470.2820000000001" y="933.7500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Z_proj : 768</text>
+</g>
+<g class="node" data-id="SPREDG" data-label="Predictor MLP student-only
+768 to 512 to 768" data-shape="rectangle">
+  <rect x="368.53800000000007" y="1000.2" width="203.48799999999997" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="470.28200000000004" y="1027.1000000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="470.28200000000004" dy="-3.9000000000000012">Predictor MLP student-only</tspan><tspan x="470.28200000000004" dy="16.900000000000002">768 to 512 to 768</tspan></text>
+</g>
+<g class="node" data-id="SZPJP" data-label="Z_proj_pred : 768" data-shape="rectangle">
+  <rect x="396.696" y="1102" width="147.17200000000003" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="470.28200000000004" y="1120.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Z_proj_pred : 768</text>
+</g>
+<g class="node" data-id="SPREDI" data-label="Predictor MLP student-only
+768 to 512 to 768" data-shape="rectangle">
+  <rect x="637.373" y="686.3500000000001" width="203.48799999999997" height="53.800000000000004" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="739.1170000000001" y="713.2500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)"><tspan x="739.1170000000001" dy="-3.9000000000000012">Predictor MLP student-only</tspan><tspan x="739.1170000000001" dy="16.900000000000002">768 to 512 to 768</tspan></text>
+</g>
+<g class="node" data-id="SZPTP" data-label="z_partial_pred : 768" data-shape="rectangle">
+  <rect x="659.603" y="817.7250000000001" width="159.02800000000002" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="739.117" y="836.1750000000002" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">z_partial_pred : 768</text>
+</g>
+</svg>
