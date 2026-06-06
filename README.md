@@ -9,6 +9,7 @@
   <img alt="Accelerate" src="https://img.shields.io/badge/%F0%9F%A4%97%20Accelerate-multi--GPU-blue">
   <img alt="Dataset" src="https://img.shields.io/badge/data-LexGLUE%20ECtHR--A-2C7FB8">
   <img alt="Status" src="https://img.shields.io/badge/status-finalized-success">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
 </p>
 
 Modern encoders capture **local** meaning beautifully but lose track of a document as a
@@ -279,3 +280,7 @@ with your admin.
 
 **Brando Mattivi · Roger Feliu** — Free University of Bozen-Bolzano
 Final Project · Natural Language Processing · 2026
+
+## License
+
+Released under the [MIT License](LICENSE) © 2026 Brando Mattivi and Roger Feliu.
