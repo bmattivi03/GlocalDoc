@@ -1,22 +1,56 @@
+# ── Python ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.env
+
+# ── Experiment artifacts (generated, never committed) ───────────────
 checkpoints/*.pt
 checkpoints/*_epoch*/
 checkpoints/mlm/
 results/*.json
+# ...but keep the published few-shot results:
+!results/finetuning_results.json
 results/*.png
 logs/*.out
 logs/*.err
-__pycache__/
-*.py[cod]
-.ipynb_checkpoints/
-notebooks/*_executed.ipynb
-.env
+logs/*.log
 wandb/
+
+# ── LaTeX build artifacts ───────────────────────────────────────────
+*.aux
+*.bbl
+*.blg
+*.out
+*.xdv
+*.synctex.gz
+paper/*.log
+doc/*.log
+
+# ── OS junk ─────────────────────────────────────────────────────────
 .DS_Store
-# Local-only: a full mirror of the trained-machine repo uploaded for analysis.
-# Keep untracked so we never accidentally commit gigabytes of checkpoints.
+
+# ── Local-only working files (kept on disk, not published to GitHub) ─
+# Internal planning / agent notes / scratch: useful locally, noise on GitHub.
+CLAUDE.md
+archive/
+notebooks/
+doc/PLAN.md
+doc/POSTER_CONTENT.md
+doc/POSTER_PLAN.md
+doc/POSTER_CHANGES.md
+doc/final_architecture.md
+doc/pretrain.txt
+# External A0 template (~4 MB), not our work:
+doc/poster_template_mit.pdf
+doc/poster_v1_dense.tex.bak
+# Orphaned (not \input by poster.tex):
+doc/poster_arch.tex
+# Stale architecture diagram, superseded by glocalDoc_architecture.pdf:
+doc/GlocalDoc.pdf
+doc/preview_thumb.png
+
+# ── Local-only large mirrors / multi-agent swarm artifacts ──────────
 GlocalDoc_trained/
-
-
-# Local-only: multi-agent research swarm run artifacts (~59MB of prompt dumps).
-# Re-runnable via `python -m swarm.orchestrator.run`; never commit the run outputs.
+glocalDoc_trained/
 swarm/
