@@ -16,3 +16,7 @@ wandb/
 # Keep untracked so we never accidentally commit gigabytes of checkpoints.
 GlocalDoc_trained/
 
+
+# Local-only: multi-agent research swarm run artifacts (~59MB of prompt dumps).
+# Re-runnable via `python -m swarm.orchestrator.run`; never commit the run outputs.
+swarm/

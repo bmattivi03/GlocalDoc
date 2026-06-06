@@ -3,7 +3,7 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{bm}
-\usetikzlibrary{arrows.meta, fit, backgrounds, calc}
+\usetikzlibrary{arrows.meta, fit, backgrounds, calc, positioning}
 
 %%─── Palette ────────────────────────────────────────────────────────────────
 \definecolor{tBlue}   {RGB}{52,119,196}
@@ -16,212 +16,137 @@
 
 %%─── Node styles ────────────────────────────────────────────────────────────
 \tikzset{
-  nd/.style  = {draw, rounded corners=5pt, align=center, inner sep=7pt,
-                minimum width=4.0cm, minimum height=0.9cm, font=\small},
+  nd/.style  = {draw, rounded corners=4pt, align=center, inner sep=5pt,
+                minimum width=3.0cm, minimum height=0.9cm, font=\small},
   T/.style   = {nd, draw=tBlue,   fill=tBlue!10},
   S/.style   = {nd, draw=sGreen,  fill=sGreen!10},
   ENC/.style = {nd, draw=eGold,   fill=eGold!15},
   IB/.style  = {nd, draw=ibOrange,fill=ibOrange!18},
   PL/.style  = {nd, draw=pPurple, fill=pPurple!12},
+  PRED/.style= {nd, draw=pPurple!80, fill=pPurple!7, densely dotted,
+                minimum width=2.2cm, minimum height=0.85cm},
   DR/.style  = {nd, draw=sGreen!70, fill=sGreen!4, densely dashed},
-  LO/.style  = {nd, draw=lossRed, fill=lossRed!10, minimum width=3.6cm},
+  LO/.style  = {nd, draw=lossRed, fill=lossRed!10, minimum width=2.8cm},
+  LOX/.style = {nd, draw=lossRed, fill=lossRed!10, minimum width=3.0cm,
+                double, double distance=1pt},
   TOT/.style = {nd, draw=uwBrown, fill=uwBrown!8, font=\small},
-  %% Arrows
   Tarr/.style ={-{Stealth[length=5pt]}, thick, tBlue!60,  dashed},
   Sarr/.style ={-{Stealth[length=5pt]}, thick, sGreen!70},
   Larr/.style ={-{Stealth[length=4pt]}, thick, lossRed},
   EMA/.style  ={-{Stealth[length=5pt]}, thick, ibOrange!80, dashed},
 }
 
-%% ─── Column x-centres ───────────────────────────────────────────────────────
-%%   Teacher  : x =  0
-%%   Loss mid : x =  5
-%%   Student  : x = 10
-%%   L_noise    (right of student) : x = 14.8
-%%
-%% ─── Row y-positions (cm, downward = more negative) ─────────────────────────
-%%   Input         : y =   0
-%%   Encoder       : y =  -2.5
-%%   CLS           : y =  -5.0
-%%   Para. dropout : y =  -7.0   (student only)
-%%   Pool          : y =  -7.5 (teacher) | -9.0 (student)
-%%   Pooled repr   : y = -10.0 (teacher) | -11.0 (student)
-%%   IB head       : y = -13.6
-%%   MLP projector : y = -16.2
-%%   Z_proj        : y = -18.4
-%%   Total loss    : y = -21.6
+%% Column x-centres :  Teacher 0 · loss-spine 3.8 · predictors 6.8 · Student 10.4 · Reg 14.8
+%% Row y-centres    :  in 0 · enc -2.3 · cls -4.6 · drop -6.6 · pool -8.4
+%%                     ztilde/zpartial -10.6 · IB -13.2 · Zproj -15.8
 
 \begin{document}
 \begin{tikzpicture}
 
-%% ═══════════════════════════════════════════════════════
-%%  TEACHER track (x = 0)
-%% ═══════════════════════════════════════════════════════
-\node[T]   (t_in)  at ( 0,   0  ) {Clean paragraphs $\mathcal{P}$\\[-2pt]
-                                    \footnotesize $N$ strings};
-
-\node[ENC] (t_enc) at ( 0,  -2.5) {DistilRoBERTa\\[-2pt]
-                                    \footnotesize stop-gradient pass};
-
-\node[T]   (t_cls) at ( 0,  -5.0) {$\bm{H}_T\in\mathbb{R}^{N\times768}$\\[-2pt]
-                                    \footnotesize CLS per paragraph (teacher)};
-
-\node[PL]  (t_pl)  at ( 0,  -7.5) {AttentionPooling\\[-2pt]
-                                    \footnotesize EMA-updated};
-
-\node[T]   (t_zp)  at ( 0, -10.0) {$\bm{Z}'\in\mathbb{R}^{768}$\\[-2pt]
-                                    \footnotesize full-doc teacher repr.};
+%% ══════════════ TEACHER branch (x = 0) — separate frozen EMA encoder ══════════════
+\node[T]   (t_in)  at (0,   0   ) {Clean paragraphs $\bm{\mathcal{P}}$\\[-2pt]\footnotesize $N$ strings};
+\node[ENC] (t_enc) at (0,  -2.3 ) {DistilRoBERTa\\[-2pt]\footnotesize EMA teacher $\cdot$ frozen $\cdot$ no-grad};
+\node[T]   (t_cls) at (0,  -4.6 ) {$\bm{H}_T\in\mathbb{R}^{N\times768}$\\[-2pt]\footnotesize CLS per paragraph};
+\node[PL]  (t_pl)  at (0,  -8.4 ) {AttentionPooling\\[-2pt]\footnotesize EMA teacher $\cdot$ frozen};
+\node[T, minimum width=3.2cm]
+           (t_zt)  at (0, -10.6 ) {$\tilde{\bm{Z}}'\in\mathbb{R}^{768}$\\[-2pt]\footnotesize teacher full-doc, DINO-centered\\[-2pt]\footnotesize $\tilde{\bm{Z}}'=\bm{Z}'-\bm{c}$};
 
 \draw[Tarr] (t_in)  -- (t_enc);
 \draw[Tarr] (t_enc) -- (t_cls);
 \draw[Tarr] (t_cls) -- (t_pl);
-\draw[Tarr] (t_pl)  -- (t_zp);
+\draw[Tarr] (t_pl)  -- (t_zt);
 
-
-%% ═══════════════════════════════════════════════════════
-%%  STUDENT track (x = 10)
-%% ═══════════════════════════════════════════════════════
-\node[S]   (s_in)  at (10,   0  ) {Masked paragraphs $\mathcal{P}_m$\\[-2pt]
-                                    \footnotesize $N$ strings · sentence drop $20\%$ $\to$ token drop $15\%$};
-
-\node[ENC] (s_enc) at (10,  -2.5) {DistilRoBERTa\\[-2pt]
-                                    \footnotesize trainable};
-
-\node[S]   (s_cls) at (10,  -5.0) {$\bm{H}_S\in\mathbb{R}^{N\times768}$\\[-2pt]
-                                    \footnotesize CLS per paragraph (student)};
-
-\node[DR]  (s_dr)  at (10,  -7.0) {Paragraph Dropout (30\%)\\[-2pt]
-                                    \footnotesize keep $M{<}N$ via indices $\mathcal{I}$};
-
-\node[PL]  (s_pl)  at (10,  -9.0) {AttentionPooling\\[-2pt]
-                                    \footnotesize trainable};
-
-\node[S]   (s_zpt) at (10, -11.0) {$\bm{z}_{\mathrm{partial}}\in\mathbb{R}^{768}$\\[-2pt]
-                                    \footnotesize student partial-doc pool};
-
-\node[IB, minimum height=2.8cm]
-           (s_ib)  at (10, -13.6) {\textbf{IB Bottleneck}\\[2pt]
-                                    $\bm{\mu}=W_\mu\,\bm{z}_{\mathrm{partial}},\;
-                                     \log\bm{\sigma}=W_\sigma\,\bm{z}_{\mathrm{partial}}$\\[2pt]
-                                    $\bm{z}=\bm{\mu}+\exp(\log\bm{\sigma})\odot\bm{\varepsilon},\;
-                                     \bm{\varepsilon}\sim\mathcal{N}(\bm{0},\bm{I})$\\[2pt]
-                                    \footnotesize
-                                    $\bm{\mu},\log\bm{\sigma},\bm{z}\in\mathbb{R}^{256}$ ·
-                                    $\log\bm{\sigma}$ clamped to $[-10,10]$};
-
-\node[IB]  (s_mlp) at (10, -16.2) {MLP Projector\\[-2pt]
-                                    \footnotesize $256\!\to\!512\!\to\!768$};
-
-\node[S]   (s_zpj) at (10, -18.4) {$\bm{Z}_{\mathrm{proj}}\in\mathbb{R}^{768}$\\[-2pt]
-                                    \footnotesize student global repr.};
+%% ══════════════ STUDENT branch (x = 10.4) — trainable ══════════════
+\node[S, minimum width=3.6cm]
+           (s_in)  at (10.4,   0   ) {Masked paragraphs $\bm{\mathcal{P}}_m$\\[-2pt]\footnotesize $N$ strings $\cdot$ sent.\ drop $20\%$ $+$ span mask $15\%$};
+\node[ENC] (s_enc) at (10.4,  -2.3 ) {DistilRoBERTa\\[-2pt]\footnotesize student $\cdot$ trainable};
+\node[S, minimum width=3.6cm]
+           (s_cls) at (10.4,  -4.6 ) {$\bm{H}_S\in\mathbb{R}^{N\times768}$\\[-2pt]\footnotesize CLS per paragraph $=\bm{s}_{\mathrm{chunks}}$};
+\node[DR]  (s_dr)  at (10.4,  -6.6 ) {Paragraph Dropout $30\%$\\[-2pt]\footnotesize keep $M{<}N$ via $\mathcal{I}$};
+\node[PL]  (s_pl)  at (10.4,  -8.4 ) {AttentionPooling\\[-2pt]\footnotesize student $\cdot$ trainable};
+\node[S]   (s_zp)  at (10.4, -10.6 ) {$\bm{z}_{\mathrm{partial}}\in\mathbb{R}^{768}$\\[-2pt]\footnotesize student partial pool};
+\node[IB, minimum width=4.9cm, minimum height=1.9cm]
+           (s_ib)  at (10.4, -13.2 ) {\textbf{IB Bottleneck}\\[1pt]
+                 \footnotesize $\bm{\mu},\log\bm{\sigma}=W_\mu\bm{z},W_\sigma\bm{z}\in\mathbb{R}^{256}$\\[-1pt]
+                 \footnotesize $\bm{z}=\bm{\mu}+\exp(\log\bm{\sigma})\odot\bm{\varepsilon}$\\[-1pt]
+                 \footnotesize $\log\bm{\sigma}\in[-10,10]$ (clamped)};
+\node[S, minimum width=3.6cm]
+           (s_zj)  at (10.4, -15.8 ) {$\bm{Z}_{\mathrm{proj}}\in\mathbb{R}^{768}$\\[-2pt]\footnotesize MLP projector $256\!\to\!512\!\to\!768$};
 
 \draw[Sarr] (s_in)  -- (s_enc);
 \draw[Sarr] (s_enc) -- (s_cls);
 \draw[Sarr] (s_cls) -- (s_dr);
 \draw[Sarr] (s_dr)  -- (s_pl);
-\draw[Sarr] (s_pl)  -- (s_zpt);
-\draw[Sarr] (s_zpt) -- (s_ib);
-\draw[Sarr] (s_ib)  -- (s_mlp);
-\draw[Sarr] (s_mlp) -- (s_zpj);
+\draw[Sarr] (s_pl)  -- (s_zp);
+\draw[Sarr] (s_zp)  -- (s_ib);
+\draw[Sarr] (s_ib)  -- (s_zj);
 
+%% ══════════════ Student-only PREDICTOR (inline, shared weights) ══════════════
+\node[PRED] (p_a) at (6.8, -10.6) {Predictor\\[-2pt]\footnotesize $\bm{z}_{\mathrm{partial}}^{\mathrm{pred}}$};
+\node[PRED] (p_b) at (6.8, -15.8) {Predictor\\[-2pt]\footnotesize $\bm{Z}_{\mathrm{proj}}^{\mathrm{pred}}$};
+\draw[Sarr] (s_zp.west) -- (p_a.east);
+\draw[Sarr] (s_zj.west) -- (p_b.east);
+\draw[densely dashed, pPurple!70] (p_a.south) -- (p_b.north)
+      node[midway, fill=white, inner sep=1pt, font=\scriptsize, text=pPurple!80]{shared $\theta$};
 
-%% ═══════════════════════════════════════════════════════
-%%  LOSS NODES
-%% ═══════════════════════════════════════════════════════
-
-%% L_local  ─ per-paragraph cosine on all N pairs ─────────
-\node[LO] (l_loc) at (5, -5.0) {$\mathcal{L}_{\mathrm{local}}$\\[-2pt]
-                                  \footnotesize cosine · all $N$ paragraph pairs};
+%% ══════════════ LOSS SPINE (x = 3.8) — each loss between its operands ══════════════
+\node[LO] (l_loc) at (3.8,  -4.6) {$\mathcal{L}_{\mathrm{local}}$\\[-2pt]\footnotesize cosine $\cdot$ all $N$ pairs};
 \draw[Larr] (t_cls.east) -- (l_loc.west);
 \draw[Larr] (s_cls.west) -- (l_loc.east);
 
-%% L_inter  ─ student partial pool vs teacher full doc ────
-\node[LO] (l_int) at (5, -10.5) {$\mathcal{L}_{\mathrm{inter}}$\\[-2pt]
-                                  \footnotesize cosine · partial $\leftrightarrow$ full doc};
-\draw[Larr] (t_zp.east)  -- (l_int.west);
-\draw[Larr] (s_zpt.west) -- (l_int.east);
+\node[LO] (l_int) at (3.8, -10.6) {$\mathcal{L}_{\mathrm{inter}}$\\[-2pt]\footnotesize cosine $\cdot$ partial (pred) vs $\tilde{\bm{Z}}'$};
+\draw[Larr] (t_zt.east) -- (l_int.west);
+\draw[Larr] (p_a.west)  -- (l_int.east);
 
-%% L_noise  ─ KL bottleneck (noise-injection regulariser) ─
-\node[LO, minimum width=4.0cm]
-      (l_noi) at (16.0, -13.6) {$\mathcal{L}_{\mathrm{noise}}$\\[-2pt]
-                                 \footnotesize $\mathrm{KL}\bigl(
-                                 \mathcal{N}(\bm{\mu},\bm{\sigma}^{2})
-                                 \,\|\,\mathcal{N}(\bm{0},\bm{I})\bigr)$};
-\draw[Larr] (s_ib.east) -- (l_noi.west);
+\node[LO] (l_glb) at (3.8, -15.8) {$\mathcal{L}_{\mathrm{global}}$\\[-2pt]\footnotesize cosine $\cdot$ post-IB (pred) vs $\tilde{\bm{Z}}'$};
+\draw[Larr] (p_b.west) -- (l_glb.east);
+\draw[Larr, rounded corners=6pt] (t_zt.south) |- (l_glb.west);   %% single teacher-target rail
 
-%% L_global  ─ student post-IB vs teacher full doc ────────
-\node[LO] (l_glb) at (5, -18.4) {$\mathcal{L}_{\mathrm{global}}$\\[-2pt]
-                                  \footnotesize cosine · full doc · post-IB};
-\draw[Larr] (s_zpj.west) -- (l_glb.east);
-\draw[Larr, rounded corners=7pt]
-     (t_zp.south) -- (0,-18.4) -- (l_glb.west);
+%% ══════════════ REGULARIZERS (x = 14.8) — beside their source ══════════════
+\node[LO, minimum width=3.0cm, minimum height=1.5cm]
+      (l_cmp) at (15.2, -13.2) {$\mathcal{L}_{\mathrm{compress}}$\\[-2pt]
+            \footnotesize $\beta(t)\,\mathrm{KL}\bigl(\mathcal{N}(\bm{\mu},\bm{\sigma}^2)\,\|\,\mathcal{N}(\bm{0},\bm{I})\bigr)$\\[-1pt]
+            \footnotesize free bits $\lambda{=}0.05$ $\cdot$ $\beta:0\!\to\!1$ (25\% steps)};
+\draw[Larr] (s_ib.east) -- (l_cmp.west);
 
+\node[LOX] (l_var) at (15.2,  -4.0) {$\mathcal{L}_{\mathrm{variance}}$\\[-2pt]\footnotesize VICReg std-hinge $\cdot$ $\lambda_{\mathrm{var}}{=}5.0$};
+\node[LOX] (l_cov) at (15.2,  -5.9) {$\mathcal{L}_{\mathrm{covariance}}$\\[-2pt]\footnotesize VICReg off-diag $\cdot$ $\lambda_{\mathrm{cov}}{=}0.04$};
+\draw[Larr] (s_cls.east) -- (l_var.west);
+\draw[Larr] (s_cls.east) -- (l_cov.west);
 
-%% ═══════════════════════════════════════════════════════
-%%  SHARED ENCODER BADGE
-%% ═══════════════════════════════════════════════════════
-\node[draw=eGold, fill=eGold!10, rounded corners=5pt,
-      font=\small\bfseries, text=eGold!80!black, inner sep=5pt]
-     (badge) at (5,-2.5) {shared encoder};
-\draw[eGold!70, dashed, thick] (t_enc.east) -- (badge.west);
-\draw[eGold!70, dashed, thick] (badge.east) -- (s_enc.west);
+%% ══════════════ EMA links (student -> teacher): encoder AND pool ══════════════
+\draw[EMA] (s_enc.west) -- (t_enc.east)
+      node[midway, above, font=\scriptsize\itshape, text=ibOrange!85!black]{EMA $\tau{=}0.996$ (encoder)};
+\draw[EMA] (s_pl.west) -- (t_pl.east)
+      node[midway, above, font=\scriptsize\itshape, text=ibOrange!85!black]{EMA $\tau{=}0.996$ (pool)};
 
+%% ══════════════ TOTAL LOSS ══════════════
+\node[TOT, minimum width=17cm, minimum height=2.0cm, align=center]
+      (l_tot) at (7.0, -18.4) {%
+      \textbf{Total loss --- Uncertainty-Weighted alignment $+$ fixed-weight VICReg}\\[3pt]
+      $\displaystyle \mathcal{L}=\!\!\sum_{i\in\{\mathrm{compress},\,\mathrm{local},\,\mathrm{inter},\,\mathrm{global}\}}\!\!\bigl(e^{-s_i}\mathcal{L}_i+s_i\bigr)\;+\;\lambda_{\mathrm{var}}\mathcal{L}_{\mathrm{variance}}\;+\;\lambda_{\mathrm{cov}}\mathcal{L}_{\mathrm{covariance}}$\\[3pt]
+      \footnotesize $s_i=\log\sigma_i^{2}$ learnable, clamped to $[-10,10]$ \qquad
+      $\lambda_{\mathrm{var}}{=}5.0,\ \lambda_{\mathrm{cov}}{=}0.04$ fixed (never down-weighted by UW)};
 
-%% ═══════════════════════════════════════════════════════
-%%  EMA UPDATE: student pool → teacher pool
-%% ═══════════════════════════════════════════════════════
-\draw[EMA, rounded corners=8pt]
-     (s_pl.west) -- (5,-9.0) -- (5,-7.5) -- (t_pl.east);
-\node[font=\footnotesize\itshape, text=ibOrange!85!black, anchor=west]
-     at (5.05,-8.25) {EMA $\tau{=}0.99$};
-
-
-%% ═══════════════════════════════════════════════════════
-%%  TOTAL LOSS — homoscedastic uncertainty weighting
-%% ═══════════════════════════════════════════════════════
-\node[TOT, minimum width=14cm, minimum height=1.7cm, align=center]
-     (l_tot) at (6.4,-21.6)
-     {\textbf{Total loss — Homoscedastic Uncertainty Weighting}\\[3pt]
-      $\displaystyle
-       \mathcal{L}\;=\!\!\sum_{i\in\{\mathrm{local},\,\mathrm{inter},\,\mathrm{global},\,\mathrm{noise}\}}\!\!\!
-       \left(\frac{1}{\sigma_i^{2}}\,\mathcal{L}_i+\log\sigma_i\right),\qquad
-       s_i\!=\!\log\sigma_i^{2}\in\mathbb{R}\text{ learnable, clamped to }[-10,10]$};
-
-
-%% ═══════════════════════════════════════════════════════
-%%  BACKGROUND PANELS
-%% ═══════════════════════════════════════════════════════
+%% ══════════════ BACKGROUND PANELS (fit, auto-sized) ══════════════
 \begin{scope}[on background layer]
-  %% Teacher panel
-  \fill[tBlue!6, rounded corners=9pt]
-    (-2.4, 0.7) rectangle (2.4,-10.85);
-  \node[tBlue!80!black, font=\bfseries, anchor=north west]
-       at (-2.3,0.7) {Teacher};
-
-  %% Student panel
-  \fill[sGreen!6, rounded corners=9pt]
-    (7.6, 0.7) rectangle (12.4,-19.15);
-  \node[sGreen!80!black, font=\bfseries, anchor=north east]
-       at (12.3,0.7) {Student};
+  \node[fill=tBlue!6, rounded corners=8pt, fit=(t_in)(t_enc)(t_cls)(t_pl)(t_zt), inner sep=9pt] (tpanel){};
+  \node[fill=sGreen!6, rounded corners=8pt, fit=(s_in)(s_enc)(s_cls)(s_dr)(s_pl)(s_zp)(s_ib)(s_zj), inner sep=9pt] (spanel){};
+  \node[draw=lossRed!45, fill=lossRed!4, rounded corners=6pt, fit=(l_var)(l_cov), inner sep=6pt] (uwbox){};
 \end{scope}
+\node[font=\bfseries\footnotesize, text=tBlue!80!black, anchor=south] at (tpanel.north) {Teacher (EMA)};
+\node[font=\bfseries\footnotesize, text=sGreen!80!black, anchor=south] at (spanel.north) {Student};
+\node[font=\bfseries\scriptsize, text=lossRed!75!black, anchor=south] at (uwbox.north) {outside UW (fixed weight)};
 
-
-%% ═══════════════════════════════════════════════════════
-%%  LEGEND
-%% ═══════════════════════════════════════════════════════
-\node[font=\footnotesize, anchor=west, align=left]
-     at (-2.4,-23.7) {%
-  \textcolor{tBlue!80}{\rule[0.4ex]{0.5cm}{0.5pt}%
-  \,\rule[0.4ex]{0.2cm}{0.5pt}\,\rule[0.4ex]{0.2cm}{0.5pt}}
-  \; stop-gradient (teacher)\qquad
-  \textcolor{sGreen!80}{\rule[0.4ex]{1.2cm}{0.5pt}}
-  \; trainable (student)\qquad
-  \textcolor{lossRed}{\rule[0.4ex]{1.2cm}{0.5pt}}
-  \; loss signal\qquad
-  \textcolor{ibOrange}{\rule[0.4ex]{0.5cm}{0.5pt}%
-  \,\rule[0.4ex]{0.2cm}{0.5pt}\,\rule[0.4ex]{0.2cm}{0.5pt}}
-  \; EMA update (pool only)
-};
+%% ══════════════ LEGEND ══════════════
+\node[font=\footnotesize, anchor=north west, align=left] at (-2.0,-20.2) {%
+  \textcolor{sGreen!80}{\rule[0.4ex]{1.0cm}{0.7pt}}~ trainable (student)\qquad
+  \textcolor{tBlue!80}{\rule[0.4ex]{1.0cm}{0.7pt}}~ EMA teacher (no-grad)\qquad
+  \textcolor{ibOrange}{\rule[0.4ex]{1.0cm}{0.7pt}}~ EMA update (encoder $+$ pool), $\tau{=}0.996$\qquad
+  \textcolor{lossRed}{\rule[0.4ex]{1.0cm}{0.7pt}}~ loss signal\\[2pt]
+  \textcolor{pPurple!80}{$[\,\cdots\,]$}~ Predictor: student-only BYOL/SimSiam head $768\!\to\!512$, LN, GELU, $\to\!768$ (shared $\theta$; teacher has none)\qquad
+  \textcolor{lossRed}{$[\!=\!]$}~ double border $=$ fixed weight, outside UW\\[2pt]
+  \textit{Training also applies temporal VICReg on $\bm{Z}_{\mathrm{proj}}^{\mathrm{pred}}$ and $\bm{\mu}$ via rolling buffers (script-level regulariser; not shown).}};
 
 \end{tikzpicture}
 \end{document}
