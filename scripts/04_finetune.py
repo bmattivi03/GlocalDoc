@@ -2,6 +2,7 @@ import sys
 import os
 import json
 import random
+import argparse
 import torch
 import numpy as np
 from torch.optim import AdamW
@@ -13,14 +14,40 @@ from src.data import load_ecthr, sample_few_shot
 from src.model import GlocalIBModel, DocumentClassifier, AttentionPooling
 
 # --- CONFIG ---
-N_LIST          = [10, 50, 100]
-SEEDS           = [0, 1, 2, 3, 4]
+# Defaults below reproduce the finalized runs. Override the N grid, seeds, or output
+# path from the CLI (see --help) to run a finer sweep WITHOUT touching the canonical
+# results file. Example finer grid:
+#   python scripts/04_finetune.py --n-list 5,10,15,20,30,50 \
+#       --out results/finetuning_results_finegrid.json
+DEFAULT_N_LIST  = [10, 50, 100]
+DEFAULT_SEEDS   = [0, 1, 2, 3, 4]
 FINETUNE_EPOCHS = 10
 LR              = 2e-5
 RESULTS_DIR     = "results"
 DEVICE          = "cuda" if torch.cuda.is_available() else "cpu"
 
 os.makedirs(RESULTS_DIR, exist_ok=True)
+
+
+def _int_csv(text):
+    """Parse a comma-separated list of ints, e.g. '5,10,15' -> [5, 10, 15]."""
+    return [int(x) for x in str(text).split(",") if x.strip() != ""]
+
+
+def build_parser():
+    p = argparse.ArgumentParser(
+        description="Few-shot fine-tuning across conditions, N, and seeds.")
+    p.add_argument("--n-list", dest="n_list", type=_int_csv, default=DEFAULT_N_LIST,
+                   help="Comma-separated labelled-examples-per-class grid "
+                        "(default: 10,50,100). Finer sweep e.g.: 5,10,15,20,30,50.")
+    p.add_argument("--seeds", type=_int_csv, default=DEFAULT_SEEDS,
+                   help="Comma-separated seeds (default: 0,1,2,3,4).")
+    p.add_argument("--out", default=os.path.join(RESULTS_DIR, "finetuning_results.json"),
+                   help="Output JSON (default: results/finetuning_results.json). "
+                        "Use a separate file for a new grid to keep finalized results.")
+    p.add_argument("--force", action="store_true",
+                   help="Allow overwriting --out if it already exists.")
+    return p
 
 # `no_pretrain` is a sanity baseline: fresh distilroberta-base + fresh attention pool.
 # If GlocalIB cannot beat this, the pre-training added nothing.
@@ -136,6 +163,16 @@ def run_few_shot(encoder, tokenizer, attn_pool, train_split, val_split, test_spl
 
 
 def main():
+    args     = build_parser().parse_args()
+    n_list   = args.n_list
+    seeds    = args.seeds
+    out_path = args.out
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    if os.path.exists(out_path) and not args.force:
+        sys.exit(f"Refusing to overwrite existing {out_path}. "
+                 f"Pass --out <new path> for a fresh grid, or --force to overwrite.")
+
+    print(f"N grid: {n_list} | seeds: {seeds} | out: {out_path}")
     print("Loading dataset...")
     dataset     = load_ecthr()
     all_results = {}
@@ -151,9 +188,9 @@ def main():
         attn_pool_state_init = {k: v.cpu().clone() for k, v in attn_pool.state_dict().items()}
         all_results[cond] = {}
 
-        for n in N_LIST:
+        for n in n_list:
             macro_scores, micro_scores = [], []
-            for seed in SEEDS:
+            for seed in seeds:
                 encoder.load_state_dict(encoder_state_init)
                 attn_pool.load_state_dict(attn_pool_state_init)
                 metrics = run_few_shot(
@@ -172,19 +209,18 @@ def main():
             print(f"  N={n:3d} | macro MEAN={np.mean(macro_scores):.4f}±{np.std(macro_scores):.4f}"
                   f" | micro MEAN={np.mean(micro_scores):.4f}±{np.std(micro_scores):.4f}")
 
-    out_path = os.path.join(RESULTS_DIR, "finetuning_results.json")
     with open(out_path, "w") as f:
         json.dump(all_results, f, indent=2)
     print(f"\nResults saved → {out_path}")
 
     print("\n--- Summary (macro-F1 mean ± std) ---")
     print(f"{'Condition':<15}", end="")
-    for n in N_LIST:
+    for n in n_list:
         print(f"  N={n:<5}", end="")
     print()
     for cond, res in all_results.items():
         print(f"{cond:<15}", end="")
-        for n in N_LIST:
+        for n in n_list:
             scores = res.get(str(n), {}).get("macro_f1", [])
             if scores:
                 print(f"  {np.mean(scores):.3f}±{np.std(scores):.3f}", end="")
@@ -194,12 +230,12 @@ def main():
 
     print("\n--- Summary (micro-F1 mean ± std) ---")
     print(f"{'Condition':<15}", end="")
-    for n in N_LIST:
+    for n in n_list:
         print(f"  N={n:<5}", end="")
     print()
     for cond, res in all_results.items():
         print(f"{cond:<15}", end="")
-        for n in N_LIST:
+        for n in n_list:
             scores = res.get(str(n), {}).get("micro_f1", [])
             if scores:
                 print(f"  {np.mean(scores):.3f}±{np.std(scores):.3f}", end="")
