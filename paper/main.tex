@@ -76,17 +76,18 @@ Free University of Bozen-Bolzano, Italy}}
 % Abstract
 % ---------------------------------------------------------------------------
 \begin{abstract}
-Modern language models produce contextual embeddings that capture local meaning
-with remarkable accuracy, yet they tend to lose track of a document considered as
-a whole. The limitation is acute for long and highly structured texts such as
-legal judgments, where the decisive signal is spread across many paragraphs. We
-present \glocal{}, a pre-training framework that trains a paragraph-level encoder
-to produce document embeddings reflecting both local content and global structure.
-\glocal{} couples a teacher-student architecture with an information bottleneck: a
-momentum teacher encodes the clean document, a student encodes a corrupted view,
-and a learned bottleneck compresses the pooled student representation while three
-alignment objectives match it to the teacher at the paragraph, partial-document,
-and full-document level. We evaluate \glocal{} against a hierarchical masked
+Language models read a sentence well but lose the thread of a long document. For a
+court judgment this matters, because what a case is really about is spread across
+many paragraphs rather than stated in any one of them. We present \glocal{}, a
+pre-training framework that teaches a paragraph-level encoder to read a judgment
+piece by piece and still hold on to the case as a whole. The idea is a
+teacher--student setup with a bottleneck: a momentum teacher encodes the clean
+judgment, a student encodes a corrupted copy, and a narrow learned channel forces
+the student to keep only what is needed to reproduce the teacher's reading at three
+scales --- each paragraph, a partial document, and the whole document. The
+global-alignment component follows the Glocal Information Bottleneck
+\cite{yang2025glocal}, proposed for time-series imputation, which we develop here
+for long, hierarchical documents. We evaluate \glocal{} against a hierarchical masked
 language model baseline (\hmlm{}) and an unpretrained baseline on few-shot
 multi-label classification of European Court of Human Rights cases. Our working
 hypothesis was that a more global embedding should help most when supervision is
@@ -108,37 +109,46 @@ learning, legal NLP, representational collapse.
 % ---------------------------------------------------------------------------
 \section{Introduction}
 % ---------------------------------------------------------------------------
-Pre-trained transformer encoders have made the local semantics of text easy to
-recover. A model such as RoBERTa \cite{liu2019roberta} assigns nearly synonymous
-sentences nearly identical vectors, and this property underpins most retrieval and
-classification systems in production. The same models are far less reliable when
-the unit of interest is an entire long document. A single forward pass is bounded
-by a context window of a few hundred tokens, and the common workaround of encoding
-a truncated prefix throws away most of the text. Pooling sentence vectors recovers
-coverage but not structure, because mean or maximum pooling treats a judgment as a
-bag of paragraphs and ignores how the parts compose into a decision.
+Today's language models are very good at the small scale. Give one two sentences
+that mean the same thing and it returns nearly identical vectors, the property
+behind most retrieval and classification systems in use \cite{liu2019roberta}. The
+trouble starts when the unit we care about is not a sentence but a whole, long
+document. A single forward pass sees only a few hundred tokens, so the usual fix
+--- feed the model the opening and discard the rest --- throws away most of the
+text. Gluing sentence vectors back together restores coverage but not structure:
+mean or maximum pooling treats a judgment as a loose bag of paragraphs and forgets
+how those parts add up to a decision.
 
-Legal text makes the problem concrete. A European Court of Human Rights (ECtHR)
-judgment states facts across dozens of numbered paragraphs, and the articles that
-were allegedly violated depend on the interaction of those paragraphs rather than
-on any one of them. Annotating such documents is expensive and requires expert
-knowledge, so the realistic setting is few-shot: a handful of labelled cases per
-article, not thousands. A representation that already encodes the global shape of a
-document, before any task labels are seen, should transfer better to this regime
-than one tuned only for token-level prediction.
+Legal text shows the problem at its sharpest, and it gives us the example we return
+to throughout the paper. Consider a European Court of Human Rights (ECtHR)
+judgment: an applicant is detained, the detention order cites no legal basis, and
+family visits are refused for months. Which Convention rights were violated is
+never written in any single paragraph --- it emerges from how the detention facts
+and the visit facts sit together. Labelling such cases takes expert effort, so in
+practice one has a handful of examples per article, not thousands. What helps in
+that setting is a representation that already knows the overall shape of a document
+before it sees a single label, which is precisely what token-level pre-training
+does not give us.
 
 We study whether an explicit compression objective can produce such a
 representation. The information bottleneck principle \cite{tishby2000information}
-prescribes keeping the part of an input that is predictive of a target while
-discarding the rest, and its variational form \cite{alemi2017deep} makes the idea
-trainable inside a neural network. We instantiate it for documents in a framework
-we call \glocal{}. A student encoder reads a corrupted view of a judgment and pools
-it into a single vector through a stochastic bottleneck; a momentum teacher reads
-the clean judgment; and the student is trained to predict the teacher at three
-granularities while paying a compression cost on the bottleneck. The design
-borrows the asymmetry of non-contrastive self-distillation
-\cite{grill2020bootstrap,chen2021exploring}, which is what prevents the encoder
-from satisfying the alignment objectives with a constant output.
+prescribes keeping the part of an input that predicts a target while discarding the
+rest, and its variational form \cite{alemi2017deep} makes the idea trainable inside
+a neural network. The specific move we build on --- aligning the latent code of a
+masked input to that of its clean counterpart under a bottleneck --- is the
+global-alignment principle of the Glocal Information Bottleneck
+\cite{yang2025glocal}, introduced for time-series imputation, where global guidance
+was shown to stop a model from overfitting local noise under heavy missingness. The
+same need arises for documents, where boilerplate and truncation play the role that
+missingness plays in time series; we adapt and extend the principle to a
+hierarchical, multi-granularity document setting in a framework we call \glocal{}. A
+student encoder reads a corrupted view of a judgment and pools it into a single
+vector through a stochastic bottleneck; a momentum teacher reads the clean judgment;
+and the student is trained to predict the teacher at three granularities while
+paying a compression cost on the bottleneck. The collapse-avoiding asymmetry of
+non-contrastive self-distillation \cite{grill2020bootstrap,chen2021exploring} is
+what keeps the encoder from satisfying the alignment objectives with a constant
+output.
 
 We compare \glocal{} to \hmlm{}, a hierarchical masked language model in the spirit
 of SMITH \cite{yang2020beyond} that keeps the same encoder and the same document
@@ -169,8 +179,466 @@ to a constant, and centring it in the style of DINO \cite{caron2021emerging}
 restores a usable training signal.
 
 % ---------------------------------------------------------------------------
+% Conceptual figure (single column)
+% ---------------------------------------------------------------------------
+\begin{figure}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tikzpicture}[
+  >={Stealth[length=5pt]},
+  cb/.style={draw, rounded corners=3pt, align=center, inner sep=4pt, font=\small,
+             minimum height=0.9cm, minimum width=2.3cm},
+  cdoc/.style={cb, draw=cNone, fill=cNone!12},
+  ct/.style  ={cb, draw=tBlue,  fill=tBlue!10},
+  cs/.style  ={cb, draw=sGreen, fill=sGreen!10},
+  cbn/.style ={cb, draw=ibOrange, fill=ibOrange!20, very thick, minimum width=1.7cm},
+  clv/.style ={cb, draw=lossRed!75, fill=lossRed!6, minimum width=3.0cm},
+  ta/.style  ={-{Stealth[length=5pt]}, thick, tBlue!60, dashed},
+  sa/.style  ={-{Stealth[length=5pt]}, thick, sGreen!70},
+  la/.style  ={-{Stealth[length=4pt]}, thick, lossRed},
+  ra/.style  ={-{Stealth[length=4pt]}, semithick, tBlue!45, dashed},
+]
+% shared input
+\node[cdoc] (doc) at (0,0) {Legal judgment\\[-1pt]\footnotesize (many paragraphs)};
+% teacher lane (top)
+\node[ct] (tin)  at (3.4, 1.7) {Clean copy};
+\node[ct] (tenc) at (6.1, 1.7) {Teacher\\[-2pt]\footnotesize frozen};
+\node[ct] (tu)   at (9.0, 1.7) {Reference\\understanding};
+% student lane (bottom)
+\node[cs] (sin)  at (3.4,-1.7) {Damaged copy\\[-2pt]\footnotesize words \&\ paragraphs removed};
+\node[cs] (senc) at (6.1,-1.7) {Student\\[-2pt]\footnotesize learning};
+\node[cbn](bot)  at (9.0,-1.7) {Bottleneck\\[-2pt]\footnotesize keep only\\what matters};
+% three zoom levels (right), stacked — pushed right for a clear gap
+\node[clv] (l1) at (13.8, 1.25) {paragraph};
+\node[clv] (l2) at (13.8, 0.0)  {partial document};
+\node[clv] (l3) at (13.8,-1.25) {whole document};
+\begin{scope}[on background layer]
+  \node[draw=lossRed!35, fill=lossRed!3, rounded corners=6pt, fit=(l1)(l2)(l3), inner sep=8pt] (lvpanel){};
+\end{scope}
+\node[font=\bfseries\scriptsize, text=lossRed!70!black, anchor=south] at (lvpanel.north) {three zoom levels};
+% input arrows
+\draw[ta] (doc) -- node[above,font=\scriptsize,text=tBlue!70]{clean} (tin);
+\draw[sa] (doc) -- node[below,font=\scriptsize,text=sGreen!70]{corrupt} (sin);
+% teacher chain
+\draw[ta] (tin) -- (tenc);  \draw[ta] (tenc) -- (tu);
+% student chain
+\draw[sa] (sin) -- (senc);  \draw[sa] (senc) -- (bot);
+% teacher reference and student output each compared at the three levels:
+% straight, non-overlapping arrows landing on the panel's left edge
+\draw[ra] (tu.east)  -- node[pos=0.55,above,font=\scriptsize,text=tBlue!70]{teacher}  ([yshift=5mm]lvpanel.west);
+\draw[la] (bot.east) -- node[pos=0.55,below,font=\scriptsize,text=lossRed]{student} ([yshift=-5mm]lvpanel.west);
+\end{tikzpicture}}
+\caption{The idea behind \glocal{}. The student sees a damaged copy of a judgment,
+squeezes it through a bottleneck that keeps only what matters, and must still
+reproduce the teacher's understanding at three zoom levels --- a single paragraph, a
+partial document, and the whole judgment. Fig.~\ref{fig:arch} makes every component
+precise.}
+\label{fig:concept}
+\end{figure}
+
+% ---------------------------------------------------------------------------
+\section{The Idea in Plain Terms}
+\label{sec:overview}
+% ---------------------------------------------------------------------------
+Before any equations, here is the whole method in one picture
+(Fig.~\ref{fig:concept}). Picture two readers of the same court judgment. The
+\emph{teacher} reads the clean, complete text and forms an impression of what the
+case is about. The \emph{student} reads a damaged photocopy --- some sentences
+smudged out, whole paragraphs missing --- and has to arrive at the same impression.
+The catch is that the student must pass its understanding through a narrow
+\emph{bottleneck}, so it cannot simply copy surface wording. It has to keep only
+what genuinely matters about the case.
+
+The student is then checked at three zoom levels and must reproduce the teacher's
+reading at each. Up close: does every paragraph it produces match the teacher's
+reading of that paragraph? At mid-range: from only the paragraphs that survived the
+damage, can it predict the teacher's reading of the whole case? At the widest view:
+once everything has been squeezed through the bottleneck, does its single compressed
+code still recover the teacher's whole-case reading? These three checks are the
+losses $\mathcal{L}_{\mathrm{local}}$, $\mathcal{L}_{\mathrm{inter}}$, and
+$\mathcal{L}_{\mathrm{global}}$ of the next section. The same gist has to hold from
+close-up to wide-angle --- which is what \emph{glocal}, global and local together,
+is meant to capture.
+
+Why a bottleneck rather than plain reconstruction? A model asked to rebuild every
+word tends to cling to local wording, and in boilerplate-heavy text that means
+clinging to noise. Making the student summarise through a narrow channel and match a
+global target instead works as a guardrail: it keeps the model honest about the case
+as a whole. This is the intuition the Glocal Information Bottleneck
+\cite{yang2025glocal} introduced for time series, and it carries over to documents.
+
+It helps to keep one case in mind. Return to the ECtHR judgment from the
+introduction: an applicant detained with no stated legal basis, family visits
+refused for months. The violated rights --- liberty, and respect for family life ---
+are never named in one place; they follow from how the detention and the visits
+combine. We use this case to make each mechanism concrete. Text masking smudges the
+sentence that names the missing legal basis. Paragraph dropout hides the
+visit-refusal paragraph and asks whether the student can still recover the
+family-life angle. Centring, introduced later, subtracts the identical procedural
+opening that every ECtHR judgment shares.
+
+The rest of the paper turns each of these words --- teacher, damaged copy,
+bottleneck, three-level match --- into a precise, trainable object
+(Fig.~\ref{fig:arch}). A reader who wants only the intuition can stop here and skip
+to the experiments.
+
+% ---------------------------------------------------------------------------
+% Architecture figure (full width)
+% ---------------------------------------------------------------------------
+\begin{figure*}[p]
+\centering
+\resizebox{0.95\textwidth}{!}{%
+\begin{tikzpicture}
+
+%% ===== TEACHER lane (x = 0): separate frozen EMA encoder =====
+\node[T]   (t_in)  at (0,   0   ) {Clean paragraphs $\bm{\mathcal{P}}$\\[-2pt]\footnotesize $N$ strings};
+\node[ENC] (t_enc) at (0,  -2.3 ) {DistilRoBERTa\\[-2pt]\footnotesize EMA teacher $\cdot$ frozen};
+\node[T]   (t_cls) at (0,  -4.6 ) {$\bm{H}_T\in\mathbb{R}^{N\times768}$\\[-2pt]\footnotesize CLS per paragraph};
+\node[PL]  (t_pl)  at (0,  -8.4 ) {AttentionPooling\\[-2pt]\footnotesize EMA teacher};
+\node[T]   (t_zt)  at (0, -10.6 ) {$\tilde{\bm{Z}}'\in\mathbb{R}^{768}$\\[-2pt]\footnotesize teacher target\\[-2pt]\footnotesize DINO-centred (Eq.~\ref{eq:center})};
+
+\draw[Tarr] (t_in)  -- (t_enc);
+\draw[Tarr] (t_enc) -- (t_cls);
+\draw[Tarr] (t_cls) -- (t_pl);
+\draw[Tarr] (t_pl)  -- (t_zt);
+
+%% ===== STUDENT lane (x = 11): trainable =====
+\node[S, minimum width=3.4cm]
+           (s_in)  at (11.0,   0   ) {Masked paragraphs $\bm{\mathcal{P}}_m$\\[-2pt]\footnotesize $N$ strings $\cdot$ text masking};
+\node[ENC] (s_enc) at (11.0,  -2.3 ) {DistilRoBERTa\\[-2pt]\footnotesize student $\cdot$ trainable};
+\node[S, minimum width=3.2cm]
+           (s_cls) at (11.0,  -4.6 ) {$\bm{H}_S\in\mathbb{R}^{N\times768}$\\[-2pt]\footnotesize CLS per paragraph};
+\node[DR]  (s_dr)  at (11.0,  -6.6 ) {Paragraph dropout $30\%$\\[-2pt]\footnotesize keep $M{<}N$};
+\node[PL]  (s_pl)  at (11.0,  -8.4 ) {AttentionPooling\\[-2pt]\footnotesize student $\cdot$ trainable};
+\node[S]   (s_zp)  at (11.0, -10.6 ) {$\bm{z}_{\mathrm{partial}}\in\mathbb{R}^{768}$\\[-2pt]\footnotesize partial pool};
+\node[IB, minimum width=3.2cm, minimum height=1.2cm]
+           (s_ib)  at (11.0, -13.2 ) {\textbf{IB Bottleneck}\\[-1pt]\footnotesize compress to $\mathbb{R}^{256}$\\[-2pt]\footnotesize (Eq.~\ref{eq:ib})};
+\node[S, minimum width=3.2cm]
+           (s_zj)  at (11.0, -15.8 ) {$\bm{Z}_{\mathrm{proj}}\in\mathbb{R}^{768}$\\[-2pt]\footnotesize projector $\to\mathbb{R}^{768}$};
+
+\draw[Sarr] (s_in)  -- (s_enc);
+\draw[Sarr] (s_enc) -- (s_cls);
+\draw[Sarr] (s_cls) -- (s_dr);
+\draw[Sarr] (s_dr)  -- (s_pl);
+\draw[Sarr] (s_pl)  -- (s_zp);
+\draw[Sarr] (s_zp)  -- (s_ib);
+\draw[Sarr] (s_ib)  -- (s_zj);
+
+%% ===== Student-only PREDICTOR (x = 7.4, shared weights) =====
+\node[PRED] (p_a) at (7.4, -10.6) {Predictor\\[-2pt]\footnotesize $\bm{z}_{\mathrm{partial}}^{\mathrm{pred}}$};
+\node[PRED] (p_b) at (7.4, -15.8) {Predictor\\[-2pt]\footnotesize $\bm{Z}_{\mathrm{proj}}^{\mathrm{pred}}$};
+\draw[Sarr] (s_zp.west) -- (p_a.east);
+\draw[Sarr] (s_zj.west) -- (p_b.east);
+\draw[densely dashed, pPurple!70] (p_a.south) -- (p_b.north)
+      node[midway, fill=white, inner sep=1pt, font=\scriptsize, text=pPurple!80]{shared $\theta$};
+
+%% ===== LOSS SPINE (x = 4.4): each loss between its operands =====
+\node[LO, minimum width=2.6cm] (l_loc) at (4.4,  -4.6) {$\mathcal{L}_{\mathrm{local}}$\\[-2pt]\footnotesize paragraphs (Eq.~\ref{eq:align})};
+\draw[Larr] (t_cls.east) -- (l_loc.west);
+\draw[Larr] (s_cls.west) -- (l_loc.east);
+
+\node[LO, minimum width=2.6cm] (l_int) at (4.4, -10.6) {$\mathcal{L}_{\mathrm{inter}}$\\[-2pt]\footnotesize partial vs teacher};
+\draw[Larr] (t_zt.east) -- (l_int.west);
+\draw[Larr] (p_a.west)  -- (l_int.east);
+
+\node[LO, minimum width=2.6cm] (l_glb) at (4.4, -15.8) {$\mathcal{L}_{\mathrm{global}}$\\[-2pt]\footnotesize post-IB vs teacher};
+\draw[Larr] (p_b.west) -- (l_glb.east);
+\draw[Larr, rounded corners=6pt] (t_zt.south) |- (l_glb.west);
+
+%% ===== REGULARIZERS (x = 16.6): clearly separated right lane =====
+\node[LO, minimum width=3.0cm, minimum height=1.2cm]
+      (l_cmp) at (16.6, -13.2) {$\mathcal{L}_{\mathrm{compress}}$\\[-2pt]\footnotesize KL to prior, free bits\\[-2pt]\footnotesize (Eq.~\ref{eq:compress})};
+\draw[Larr] (s_ib.east) -- (l_cmp.west);
+
+\node[LOX] (l_var) at (16.6,  -4.0) {$\mathcal{L}_{\mathrm{variance}}$\\[-2pt]\footnotesize VICReg std-hinge};
+\node[LOX] (l_cov) at (16.6,  -5.9) {$\mathcal{L}_{\mathrm{covariance}}$\\[-2pt]\footnotesize VICReg off-diag};
+\draw[Larr] (s_cls.east) -- (l_var.west);
+\draw[Larr] (s_cls.east) -- (l_cov.west);
+
+%% ===== EMA links (student -> teacher): encoder AND pool =====
+\draw[EMA] (s_enc.west) -- (t_enc.east)
+      node[midway, above, font=\scriptsize\itshape, text=ibOrange!85!black]{EMA $\tau{=}0.996$ (encoder)};
+\draw[EMA] (s_pl.west) -- (t_pl.east)
+      node[midway, above, font=\scriptsize\itshape, text=ibOrange!85!black]{EMA $\tau{=}0.996$ (pool)};
+
+%% ===== TOTAL LOSS (equation-free banner) =====
+\node[TOT, minimum width=18cm, minimum height=1.0cm, align=center]
+      (l_tot) at (8.0, -18.6) {%
+      \textbf{Total loss} $=$ uncertainty-weighted alignment (Eq.~\ref{eq:uw})
+      $+$ fixed-weight VICReg, outside UW (Eq.~\ref{eq:total}).
+      \;$s_i=\log\sigma_i^{2}$ learnable, clamped to $[-10,10]$.};
+
+%% ===== BACKGROUND PANELS (fit, auto-sized) =====
+\begin{scope}[on background layer]
+  \node[fill=tBlue!6, rounded corners=8pt, fit=(t_in)(t_enc)(t_cls)(t_pl)(t_zt), inner sep=9pt] (tpanel){};
+  \node[fill=sGreen!6, rounded corners=8pt, fit=(s_in)(s_enc)(s_cls)(s_dr)(s_pl)(s_zp)(s_ib)(s_zj), inner sep=9pt] (spanel){};
+  \node[draw=lossRed!45, fill=lossRed!4, rounded corners=6pt, fit=(l_var)(l_cov), inner sep=6pt] (uwbox){};
+\end{scope}
+\node[font=\bfseries\footnotesize, text=tBlue!80!black, anchor=south] at (tpanel.north) {Teacher (EMA)};
+\node[font=\bfseries\footnotesize, text=sGreen!80!black, anchor=south] at (spanel.north) {Student};
+\node[font=\bfseries\scriptsize, text=lossRed!75!black, anchor=south] at (uwbox.north) {outside UW (fixed weight)};
+
+%% ===== LEGEND (four colour swatches only) =====
+\node[font=\footnotesize, anchor=north west, align=left] at (-1.5,-19.7) {%
+  \textcolor{sGreen!80}{\rule[0.4ex]{0.8cm}{0.7pt}}~ trainable student \quad
+  \textcolor{tBlue!80}{\rule[0.4ex]{0.8cm}{0.7pt}}~ EMA teacher (no-grad) \quad
+  \textcolor{ibOrange}{\rule[0.4ex]{0.8cm}{0.7pt}}~ EMA update ($\tau{=}0.996$) \quad
+  \textcolor{lossRed}{\rule[0.4ex]{0.8cm}{0.7pt}}~ loss signal \quad
+  \textcolor{lossRed}{$[\!=\!]$}~ double border $=$ fixed weight (outside UW)};
+
+\end{tikzpicture}}
+\caption{The \glocal{} architecture --- the precise version of the intuition in
+Fig.~\ref{fig:concept}. A frozen exponential-moving-average \emph{teacher} (left,
+blue) encodes the clean paragraphs and produces a DINO-centred full-document target
+(Eq.~\ref{eq:center}). The trainable \emph{student} (right, green) encodes a masked
+view, drops $30\%$ of paragraphs at the pooling stage, compresses the partial pool
+through the information bottleneck (Eq.~\ref{eq:ib}), and projects it back to
+$\mathbb{R}^{768}$. The central \emph{loss spine} carries the three cosine alignment
+terms (Eq.~\ref{eq:align}): $\mathcal{L}_{\mathrm{local}}$ matches paragraph vectors,
+while $\mathcal{L}_{\mathrm{inter}}$ and $\mathcal{L}_{\mathrm{global}}$ match the
+student's partial- and full-document codes to the teacher target. A single
+student-only BYOL/SimSiam predictor (purple, $768\!\to\!512$, LayerNorm, GELU,
+$\to\!768$, shared $\theta$; the teacher has none) breaks the constant-output fixed
+point. The compression term (Eq.~\ref{eq:compress}) and the VICReg
+variance/covariance penalties (right lane, double border) carry fixed weights
+\emph{outside} the uncertainty-weighted sum (Eqs.~\ref{eq:uw}--\ref{eq:total}).
+Temporal VICReg on $\bm{Z}_{\mathrm{proj}}^{\mathrm{pred}}$ and $\bm{\mu}$ is applied
+at the script level and omitted here.}
+\label{fig:arch}
+\end{figure*}
+
+% ---------------------------------------------------------------------------
+\section{The GlocalDoc Framework}
+\label{sec:method}
+% ---------------------------------------------------------------------------
+This section turns the cartoon of Section~\ref{sec:overview} into precise objects.
+Figure~\ref{fig:arch} is the exact counterpart of Fig.~\ref{fig:concept} --- the same
+two branches, the same bottleneck, the same three-level match, now with every tensor
+named. We fix notation, then describe the encoder, the two-level corruption, the
+bottleneck, the three alignment losses, and the mechanisms that keep training stable.
+
+\subsection{Notation and hierarchical encoding}
+We read a judgment the way one skims a case file: one paragraph at a time, then
+combine the per-paragraph impressions into a single sense of the whole. This
+subsection makes ``impression'' and ``combine'' precise. A document is a sequence of
+paragraphs $x = (p_1, \dots, p_N)$ with
+$5 \le N \le 50$. Each paragraph is encoded independently by a shared transformer
+$f_\theta$, taking the \texttt{[CLS]} representation as the paragraph vector.
+Paragraphs longer than $510$ tokens are split into non-overlapping sub-chunks, each
+encoded separately, and their \texttt{[CLS]} vectors are averaged, so that a
+paragraph of any length maps to one vector in $\mathbb{R}^{768}$. Stacking gives the
+paragraph matrix $S = [s_1; \dots; s_N] \in \mathbb{R}^{N \times 768}$.
+
+A document vector is produced by an attention pooler
+\begin{equation}
+a_i = \frac{\exp(q^\top (s_i + e_i))}{\sum_{j} \exp(q^\top (s_j + e_j))}, \quad
+\mathrm{pool}(S) = \sum_i a_i (s_i + e_i),
+\end{equation}
+where $q$ is a learned query and $e_i$ are learned positional embeddings. The
+positional embeddings are initialised to zero, so the pooler begins as exact mean
+pooling and departs from it only as training requires.
+
+\subsection{Two-level masking}
+This is the damaged photocopy of the Overview, made concrete: we corrupt the
+student's input in two independent ways at once, so it has to recover the case from a
+partial, noisy view. For our running example, text masking might blur the sentence
+naming the missing legal basis, while paragraph dropout hides the visit-refusal
+paragraph altogether. \glocal{} corrupts the input at two independent levels. At the
+text level, each
+paragraph is masked before being read by the student: sentences are dropped with
+probability $0.20$, and within the surviving text spans of three to five words are
+replaced by a single mask token until about $15\%$ of words are covered. At the
+structural level, a paragraph dropout removes $30\%$ of paragraphs, but only at the
+pooling stage. The student encoder still sees all $N$ masked paragraphs; the dropout
+selects a subset of the resulting vectors before pooling, which yields a partial
+view $z_{\mathrm{partial}} = \mathrm{pool}(S_{\mathrm{kept}})$. Keeping all $N$
+paragraphs in the encoder is required so that the paragraph-level objective can
+compare student and teacher vectors position by position.
+
+\subsection{Information bottleneck}
+Here is the funnel. We push the student's document vector through a deliberately
+narrow, slightly noisy channel, so only information that genuinely helps reproduce
+the teacher's reading can get through. The compression cost is what keeps the channel
+narrow, and a warm-up stops it from biting before the student has learned anything
+worth keeping. Concretely, the partial document vector is passed through a stochastic
+bottleneck. Two linear
+heads produce a mean and a log standard deviation, and a latent code is sampled with
+the reparameterisation trick,
+\begin{equation}
+\label{eq:ib}
+\mu = W_\mu z_{\mathrm{partial}}, \quad
+\log\sigma = \mathrm{clip}(W_\sigma z_{\mathrm{partial}}, -10, 10),
+\end{equation}
+\begin{equation}
+z = \mu + \sigma \odot \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I),
+\end{equation}
+with $z \in \mathbb{R}^{256}$. A two-layer projector $g$ maps $z$ back to
+$\mathbb{R}^{768}$, giving $Z_{\mathrm{proj}} = g(z)$. The compression cost is the
+Kullback-Leibler divergence to a standard normal prior, computed in closed form and
+floored per dimension by a free-bits budget $\lambda$,
+\begin{equation}
+\label{eq:compress}
+\mathcal{L}_{\mathrm{compress}} = \beta_t \sum_{j=1}^{256}
+\max\!\Big(\lambda,\ \tfrac{1}{2}\big(\mu_j^2 + \sigma_j^2 - 1 - 2\log\sigma_j\big)\Big).
+\end{equation}
+The clip on $\log\sigma$ keeps the term finite under bfloat16. The weight $\beta_t$
+follows a linear warm-up from zero to one over the first quarter of training, which
+lets the alignment objectives organise the representation before compression starts
+to bite. We use $\lambda = 0.05$ nats per dimension; a larger floor instead pins the
+mean to a fixed magnitude regardless of the input, the opposite of what we want
+(Appendix~\ref{app:loss}).
+
+\subsection{Multi-granularity alignment}
+These three losses are the three zoom levels of the Overview written as equations: at
+each scale, the student's reading must match the teacher's. The teacher is a momentum
+copy of the encoder and pooler, never updated by gradient.
+It reads the clean document and produces a full-document target
+$Z' = \mathrm{pool}_{\mathrm{T}}(S_{\mathrm{T}})$, which is centred as described
+below. Writing $\mathrm{sg}$ for stop-gradient, $h$ for the predictor, and
+$d(u,v) = 1 - \cos(u,v)$ for the cosine distance, the three alignment losses are
+\begin{align}
+\mathcal{L}_{\mathrm{local}} &= d\big(S,\ \mathrm{sg}(S_{\mathrm{T}})\big), \label{eq:align}\\
+\mathcal{L}_{\mathrm{inter}} &= d\big(h(z_{\mathrm{partial}}),\ \mathrm{sg}(Z')\big), \\
+\mathcal{L}_{\mathrm{global}} &= d\big(h(Z_{\mathrm{proj}}),\ \mathrm{sg}(Z')\big).
+\end{align}
+The local term matches every student paragraph vector to the corresponding teacher
+paragraph vector. The intermediate term asks the partial pooled view to predict the
+full document before compression, and the global term asks the compressed and
+projected code to predict the same target after compression. Both document-level
+terms regress onto a single teacher vector, so the bottleneck must preserve whatever
+is needed to reconstruct the global representation from a partial and corrupted
+input. These two document-level terms are the document analogue of the
+global-alignment loss of the Glocal Information Bottleneck \cite{yang2025glocal},
+with $\mathcal{L}_{\mathrm{local}}$ playing the role of its local, point-wise
+counterpart at paragraph granularity.
+
+\subsection{Preventing collapse}
+A model can satisfy all three matching tasks by emitting the same vector for every
+document --- a perfect score, and a useless representation. This subsection is the
+set of guardrails that close off that shortcut, and the decisive one turns out to be
+specific to legal text. The predictor $h$ is applied to the student branch only. This asymmetry, together
+with the stop-gradient on the teacher, is the formal mechanism that removes the
+constant-output fixed point in non-contrastive self-distillation
+\cite{grill2020bootstrap,chen2021exploring}. The teacher tracks the student through
+an exponential moving average with rate $\tau = 0.996$, applied to both encoder and
+pooler after every optimiser step; running statistics in normalisation layers are
+copied rather than averaged, since averaging them drifts away from the student's
+activation distribution.
+
+On its own the asymmetry was not enough on legal text. We add the variance and
+covariance regularisers of VICReg \cite{bardes2022vicreg} on the student paragraph
+vectors: the first keeps each feature dimension from shrinking to a constant, the
+second decorrelates dimensions so they cannot collapse onto one another. Because
+per-document statistics cannot see variation \emph{across} documents, we apply the
+same two penalties in a temporal form --- against a rolling buffer of recent
+samples --- to discourage a representation that is identical from one document to the
+next even when it varies within a document. The exact formulas are given in
+Appendix~\ref{app:collapse}.
+
+The remaining and most important fix concerns the teacher target itself. ECtHR
+judgments share a large amount of boilerplate, and in the encoder's initial space
+the documents are nearly indistinguishable: a probe over $200$ documents found a
+median pairwise cosine of $0.9997$, with every ordered pair above $0.99$. A teacher
+target that is almost constant across documents lets the predictor satisfy
+$\mathcal{L}_{\mathrm{inter}}$ and $\mathcal{L}_{\mathrm{global}}$ by emitting that
+constant. We remove this fixed point with DINO-style centring
+\cite{caron2021emerging}: a running mean $c$ is maintained with momentum $0.9$ and
+subtracted from the teacher output,
+\begin{equation}
+\label{eq:center}
+Z'_{\mathrm{c}} = Z' - c, \qquad
+c \leftarrow 0.9\,c + 0.1\,\overline{Z'}_{\mathrm{batch}}.
+\end{equation}
+The centred vector is the actual regression target. Section~\ref{sec:results} shows
+that this single change is what keeps training stable.
+
+\subsection{Objective and optimisation}
+We are juggling four objectives at once, and hand-tuning four weights is fragile.
+Instead the model learns how much to trust each objective, while the anti-collapse
+guardrails are held at a fixed, non-negotiable weight. The four primary losses are
+combined by homoscedastic uncertainty weighting
+\cite{kendall2018multi} with learned log-variances
+$s = (s_{\mathrm{c}}, s_{\mathrm{l}}, s_{\mathrm{i}}, s_{\mathrm{g}})$,
+\begin{equation}
+\label{eq:uw}
+\mathcal{L}_{\mathrm{UW}} = \!\!\sum_{k} \big(e^{-s_k}\,\mathcal{L}_k + s_k\big),
+\end{equation}
+and the anti-collapse regularisers are added with fixed weights outside the weighted
+sum,
+\begin{equation}
+\label{eq:total}
+\mathcal{L} = \mathcal{L}_{\mathrm{UW}} + \omega_v V(S) + \omega_c C(S)
++ \mathcal{L}_{\mathrm{temporal}}.
+\end{equation}
+The weights $s$ are given their own parameter group with a learning rate three
+orders of magnitude larger than the encoder and no weight decay. Without this, the
+gradient on $s$ is too small to move the weights away from their initialisation, and
+the uncertainty weighting stays degenerate at uniform weights for the whole run.
+
+\subsection{The H-MLM baseline}
+To isolate what the bottleneck-and-alignment idea actually buys, we build a fair
+rival: it keeps the identical architecture but swaps the objective for the
+conventional one --- predict masked tokens, plus a single pooling target --- so any
+difference in results is attributable to the objective, not the network. \hmlm{}
+keeps the backbone, the paragraph encoding, and the attention pooler, and
+removes everything specific to \glocal{}. It optimises a token-level masked language
+modelling loss $\mathcal{L}_{\mathrm{mlm}}$ on each paragraph with a $15\%$ mask
+rate, and a single pooling objective that asks the attention pool over a $70\%$
+subset of paragraphs to predict the stop-gradient mean of all paragraph vectors,
+\begin{equation}
+\mathcal{L} = \tfrac{1}{2}\mathcal{L}_{\mathrm{mlm}}
++ \tfrac{1}{2}\,d\big(\mathrm{pool}(S_{\mathrm{kept}}),\ \mathrm{sg}(\overline{S})\big).
+\end{equation}
+There is no bottleneck, no teacher, no predictor, and no uncertainty weighting. The
+comparison between \glocal{} and \hmlm{} is therefore a comparison of pre-training
+objectives under an identical architecture and an identical fine-tuning procedure.
+
+% ---------------------------------------------------------------------------
 \section{Related Work}
 % ---------------------------------------------------------------------------
+With the method in hand, we can place it among the ideas it builds on and the
+alternatives it is measured against.
+
+\subsection{Global-local information bottlenecks}
+Closest to our objective is the Glocal Information Bottleneck \cite{yang2025glocal},
+proposed for time-series imputation. It augments an information bottleneck with a
+\emph{global-alignment} loss --- derived from a tractable approximation to the mutual
+information between a masked input's representation and that of its clean original ---
+alongside a local, point-wise reconstruction term. The method is model-agnostic and
+needs only a single MLP, and its motivation is that global guidance stops a model
+from overfitting local noise when much of the input is missing. \glocal{} inherits
+this global-versus-local split directly: our $\mathcal{L}_{\mathrm{inter}}$ and
+$\mathcal{L}_{\mathrm{global}}$ are the global-alignment idea applied to documents,
+and $\mathcal{L}_{\mathrm{local}}$ is its local counterpart at paragraph
+granularity. What we add is everything that carries the idea from time series to
+long, structured legal text: a hierarchical paragraph encoder, two-level masking, an
+intermediate partial-document level, an EMA teacher with a student-only predictor,
+DINO-style centring against boilerplate, and a few-shot evaluation that exposes a
+crossover with the amount of supervision. Table~\ref{tab:inherit} summarises the
+split between what is inherited and what is new.
+
+\begin{table}[t]
+\centering
+\caption{What \glocal{} inherits from the Glocal Information Bottleneck
+\cite{yang2025glocal} and what it adds for hierarchical legal documents.}
+\label{tab:inherit}
+\footnotesize
+\begin{tabular}{@{}p{0.66\columnwidth} l@{}}
+\toprule
+Component & Source \\
+\midrule
+Global-alignment loss (masked code vs.\ clean code under an IB) & Glocal-IB \\
+Local, point-wise alignment term & Glocal-IB \\
+Variational bottleneck, free bits, $\beta$ warm-up & VIB / Glocal-IB \\
+Hierarchical paragraph encoder + attention pooling & ours \\
+Two-level masking (text spans + paragraph dropout) & ours \\
+Intermediate, partial-document alignment level & ours \\
+EMA momentum teacher + student-only predictor & ours, via BYOL/DINO \\
+DINO-style centring for boilerplate collapse & ours \\
+Few-shot legal evaluation + $N$-dependent crossover & ours \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Information bottleneck and variational compression}
 The information bottleneck frames representation learning as a trade-off between
@@ -234,298 +702,6 @@ loss as a Gaussian likelihood with a learned observation noise and produces
 self-tuning weights. We keep the anti-collapse regularisers outside this mechanism,
 since a signal whose purpose is to prevent degeneracy must not be down-weighted by
 the same optimiser that benefits from degeneracy.
-
-% ---------------------------------------------------------------------------
-% Architecture figure (full width)
-% ---------------------------------------------------------------------------
-\begin{figure*}[p]
-\centering
-\resizebox{0.95\textwidth}{!}{%
-\begin{tikzpicture}
-
-%% TEACHER branch (x = 0): separate frozen EMA encoder
-\node[T]   (t_in)  at (0,   0   ) {Clean paragraphs $\bm{\mathcal{P}}$\\[-2pt]\footnotesize $N$ strings};
-\node[ENC] (t_enc) at (0,  -2.3 ) {DistilRoBERTa\\[-2pt]\footnotesize EMA teacher $\cdot$ frozen $\cdot$ no-grad};
-\node[T]   (t_cls) at (0,  -4.6 ) {$\bm{H}_T\in\mathbb{R}^{N\times768}$\\[-2pt]\footnotesize CLS per paragraph};
-\node[PL]  (t_pl)  at (0,  -8.4 ) {AttentionPooling\\[-2pt]\footnotesize EMA teacher $\cdot$ frozen};
-\node[T, minimum width=3.2cm]
-           (t_zt)  at (0, -10.6 ) {$\tilde{\bm{Z}}'\in\mathbb{R}^{768}$\\[-2pt]\footnotesize teacher full-doc, DINO-centered\\[-2pt]\footnotesize $\tilde{\bm{Z}}'=\bm{Z}'-\bm{c}$};
-
-\draw[Tarr] (t_in)  -- (t_enc);
-\draw[Tarr] (t_enc) -- (t_cls);
-\draw[Tarr] (t_cls) -- (t_pl);
-\draw[Tarr] (t_pl)  -- (t_zt);
-
-%% STUDENT branch (x = 10.4): trainable
-\node[S, minimum width=3.6cm]
-           (s_in)  at (10.4,   0   ) {Masked paragraphs $\bm{\mathcal{P}}_m$\\[-2pt]\footnotesize $N$ strings $\cdot$ sent.\ drop $20\%$ $+$ span mask $15\%$};
-\node[ENC] (s_enc) at (10.4,  -2.3 ) {DistilRoBERTa\\[-2pt]\footnotesize student $\cdot$ trainable};
-\node[S, minimum width=3.6cm]
-           (s_cls) at (10.4,  -4.6 ) {$\bm{H}_S\in\mathbb{R}^{N\times768}$\\[-2pt]\footnotesize CLS per paragraph $=\bm{s}_{\mathrm{chunks}}$};
-\node[DR]  (s_dr)  at (10.4,  -6.6 ) {Paragraph Dropout $30\%$\\[-2pt]\footnotesize keep $M{<}N$ via $\mathcal{I}$};
-\node[PL]  (s_pl)  at (10.4,  -8.4 ) {AttentionPooling\\[-2pt]\footnotesize student $\cdot$ trainable};
-\node[S]   (s_zp)  at (10.4, -10.6 ) {$\bm{z}_{\mathrm{partial}}\in\mathbb{R}^{768}$\\[-2pt]\footnotesize student partial pool};
-\node[IB, minimum width=4.9cm, minimum height=1.9cm]
-           (s_ib)  at (10.4, -13.2 ) {\textbf{IB Bottleneck}\\[1pt]
-                 \footnotesize $\bm{\mu},\log\bm{\sigma}=W_\mu\bm{z},W_\sigma\bm{z}\in\mathbb{R}^{256}$\\[-1pt]
-                 \footnotesize $\bm{z}=\bm{\mu}+\exp(\log\bm{\sigma})\odot\bm{\varepsilon}$\\[-1pt]
-                 \footnotesize $\log\bm{\sigma}\in[-10,10]$ (clamped)};
-\node[S, minimum width=3.6cm]
-           (s_zj)  at (10.4, -15.8 ) {$\bm{Z}_{\mathrm{proj}}\in\mathbb{R}^{768}$\\[-2pt]\footnotesize MLP projector $256\!\to\!512\!\to\!768$};
-
-\draw[Sarr] (s_in)  -- (s_enc);
-\draw[Sarr] (s_enc) -- (s_cls);
-\draw[Sarr] (s_cls) -- (s_dr);
-\draw[Sarr] (s_dr)  -- (s_pl);
-\draw[Sarr] (s_pl)  -- (s_zp);
-\draw[Sarr] (s_zp)  -- (s_ib);
-\draw[Sarr] (s_ib)  -- (s_zj);
-
-%% Student-only PREDICTOR (inline, shared weights)
-\node[PRED] (p_a) at (6.8, -10.6) {Predictor\\[-2pt]\footnotesize $\bm{z}_{\mathrm{partial}}^{\mathrm{pred}}$};
-\node[PRED] (p_b) at (6.8, -15.8) {Predictor\\[-2pt]\footnotesize $\bm{Z}_{\mathrm{proj}}^{\mathrm{pred}}$};
-\draw[Sarr] (s_zp.west) -- (p_a.east);
-\draw[Sarr] (s_zj.west) -- (p_b.east);
-\draw[densely dashed, pPurple!70] (p_a.south) -- (p_b.north)
-      node[midway, fill=white, inner sep=1pt, font=\scriptsize, text=pPurple!80]{shared $\theta$};
-
-%% LOSS SPINE (x = 3.8): each loss between its operands
-\node[LO] (l_loc) at (3.8,  -4.6) {$\mathcal{L}_{\mathrm{local}}$\\[-2pt]\footnotesize cosine $\cdot$ all $N$ pairs};
-\draw[Larr] (t_cls.east) -- (l_loc.west);
-\draw[Larr] (s_cls.west) -- (l_loc.east);
-
-\node[LO] (l_int) at (3.8, -10.6) {$\mathcal{L}_{\mathrm{inter}}$\\[-2pt]\footnotesize cosine $\cdot$ partial (pred) vs $\tilde{\bm{Z}}'$};
-\draw[Larr] (t_zt.east) -- (l_int.west);
-\draw[Larr] (p_a.west)  -- (l_int.east);
-
-\node[LO] (l_glb) at (3.8, -15.8) {$\mathcal{L}_{\mathrm{global}}$\\[-2pt]\footnotesize cosine $\cdot$ post-IB (pred) vs $\tilde{\bm{Z}}'$};
-\draw[Larr] (p_b.west) -- (l_glb.east);
-\draw[Larr, rounded corners=6pt] (t_zt.south) |- (l_glb.west);
-
-%% REGULARIZERS (x = 15.2): beside their source
-\node[LO, minimum width=3.0cm, minimum height=1.5cm]
-      (l_cmp) at (15.2, -13.2) {$\mathcal{L}_{\mathrm{compress}}$\\[-2pt]
-            \footnotesize $\beta(t)\,\mathrm{KL}\bigl(\mathcal{N}(\bm{\mu},\bm{\sigma}^2)\,\|\,\mathcal{N}(\bm{0},\bm{I})\bigr)$\\[-1pt]
-            \footnotesize free bits $\lambda{=}0.05$ $\cdot$ $\beta:0\!\to\!1$ (25\% steps)};
-\draw[Larr] (s_ib.east) -- (l_cmp.west);
-
-\node[LOX] (l_var) at (15.2,  -4.0) {$\mathcal{L}_{\mathrm{variance}}$\\[-2pt]\footnotesize VICReg std-hinge $\cdot$ $\lambda_{\mathrm{var}}{=}5.0$};
-\node[LOX] (l_cov) at (15.2,  -5.9) {$\mathcal{L}_{\mathrm{covariance}}$\\[-2pt]\footnotesize VICReg off-diag $\cdot$ $\lambda_{\mathrm{cov}}{=}0.04$};
-\draw[Larr] (s_cls.east) -- (l_var.west);
-\draw[Larr] (s_cls.east) -- (l_cov.west);
-
-%% EMA links (student -> teacher): encoder AND pool
-\draw[EMA] (s_enc.west) -- (t_enc.east)
-      node[midway, above, font=\scriptsize\itshape, text=ibOrange!85!black]{EMA $\tau{=}0.996$ (encoder)};
-\draw[EMA] (s_pl.west) -- (t_pl.east)
-      node[midway, above, font=\scriptsize\itshape, text=ibOrange!85!black]{EMA $\tau{=}0.996$ (pool)};
-
-%% TOTAL LOSS
-\node[TOT, minimum width=17cm, minimum height=2.0cm, align=center]
-      (l_tot) at (7.0, -18.4) {%
-      \textbf{Total loss: Uncertainty-Weighted alignment $+$ fixed-weight VICReg}\\[3pt]
-      $\displaystyle \mathcal{L}=\!\!\sum_{i\in\{\mathrm{compress},\,\mathrm{local},\,\mathrm{inter},\,\mathrm{global}\}}\!\!\bigl(e^{-s_i}\mathcal{L}_i+s_i\bigr)\;+\;\lambda_{\mathrm{var}}\mathcal{L}_{\mathrm{variance}}\;+\;\lambda_{\mathrm{cov}}\mathcal{L}_{\mathrm{covariance}}$\\[3pt]
-      \footnotesize $s_i=\log\sigma_i^{2}$ learnable, clamped to $[-10,10]$ \qquad
-      $\lambda_{\mathrm{var}}{=}5.0,\ \lambda_{\mathrm{cov}}{=}0.04$ fixed (never down-weighted by UW)};
-
-%% BACKGROUND PANELS (fit, auto-sized)
-\begin{scope}[on background layer]
-  \node[fill=tBlue!6, rounded corners=8pt, fit=(t_in)(t_enc)(t_cls)(t_pl)(t_zt), inner sep=9pt] (tpanel){};
-  \node[fill=sGreen!6, rounded corners=8pt, fit=(s_in)(s_enc)(s_cls)(s_dr)(s_pl)(s_zp)(s_ib)(s_zj), inner sep=9pt] (spanel){};
-  \node[draw=lossRed!45, fill=lossRed!4, rounded corners=6pt, fit=(l_var)(l_cov), inner sep=6pt] (uwbox){};
-\end{scope}
-\node[font=\bfseries\footnotesize, text=tBlue!80!black, anchor=south] at (tpanel.north) {Teacher (EMA)};
-\node[font=\bfseries\footnotesize, text=sGreen!80!black, anchor=south] at (spanel.north) {Student};
-\node[font=\bfseries\scriptsize, text=lossRed!75!black, anchor=south] at (uwbox.north) {outside UW (fixed weight)};
-
-%% LEGEND
-\node[font=\footnotesize, anchor=north west, align=left] at (-2.0,-20.2) {%
-  \textcolor{sGreen!80}{\rule[0.4ex]{1.0cm}{0.7pt}}~ trainable (student)\qquad
-  \textcolor{tBlue!80}{\rule[0.4ex]{1.0cm}{0.7pt}}~ EMA teacher (no-grad)\qquad
-  \textcolor{ibOrange}{\rule[0.4ex]{1.0cm}{0.7pt}}~ EMA update (encoder $+$ pool), $\tau{=}0.996$\qquad
-  \textcolor{lossRed}{\rule[0.4ex]{1.0cm}{0.7pt}}~ loss signal\\[2pt]
-  \textcolor{pPurple!80}{$[\,\cdots\,]$}~ Predictor: student-only BYOL/SimSiam head $768\!\to\!512$, LN, GELU, $\to\!768$ (shared $\theta$; teacher has none)\qquad
-  \textcolor{lossRed}{$[\!=\!]$}~ double border $=$ fixed weight, outside UW\\[2pt]
-  \textit{Training also applies temporal VICReg on $\bm{Z}_{\mathrm{proj}}^{\mathrm{pred}}$ and $\bm{\mu}$ via rolling buffers (script-level regulariser; not shown).}};
-
-\end{tikzpicture}}
-\caption{The \glocal{} architecture. The teacher branch (left, blue) is a frozen
-exponential moving average of the student: it encodes the clean paragraphs with
-DistilRoBERTa, pools them, and centres the full-document target as
-$\tilde{\bm{Z}}'=\bm{Z}'-\bm{c}$ to remove the constant boilerplate direction. The
-student branch (right, green) encodes a masked view, drops $30\%$ of paragraphs at
-the pooling stage, compresses the partial pool through the information bottleneck,
-and projects it back to $\mathbb{R}^{768}$. A single student-only BYOL/SimSiam
-predictor with shared weights $\theta$ is applied to both the partial pool and the
-projected code. The loss spine (centre) holds the three cosine alignment terms,
-$\mathcal{L}_{\mathrm{local}}$ between paragraph matrices and
-$\mathcal{L}_{\mathrm{inter}},\mathcal{L}_{\mathrm{global}}$ against the centred
-teacher target, together with the compression term
-$\mathcal{L}_{\mathrm{compress}}$, all balanced by uncertainty weighting. The
-VICReg variance and covariance regularisers (right) act on the student paragraph
-vectors with fixed weights, outside the uncertainty-weighted sum. Temporal VICReg
-on $\bm{Z}_{\mathrm{proj}}^{\mathrm{pred}}$ and $\bm{\mu}$ is applied at the script
-level and omitted here.}
-\label{fig:arch}
-\end{figure*}
-
-% ---------------------------------------------------------------------------
-\section{The GlocalDoc Framework}
-\label{sec:method}
-% ---------------------------------------------------------------------------
-Figure~\ref{fig:arch} summarises the architecture. We first fix notation, then
-describe the encoder, the two-level masking, the bottleneck, the alignment losses,
-and the mechanisms that keep training stable.
-
-\subsection{Notation and hierarchical encoding}
-A document is a sequence of paragraphs $x = (p_1, \dots, p_N)$ with
-$5 \le N \le 50$. Each paragraph is encoded independently by a shared transformer
-$f_\theta$, taking the \texttt{[CLS]} representation as the paragraph vector.
-Paragraphs longer than $510$ tokens are split into non-overlapping sub-chunks, each
-encoded separately, and their \texttt{[CLS]} vectors are averaged, so that a
-paragraph of any length maps to one vector in $\mathbb{R}^{768}$. Stacking gives the
-paragraph matrix $S = [s_1; \dots; s_N] \in \mathbb{R}^{N \times 768}$.
-
-A document vector is produced by an attention pooler
-\begin{equation}
-a_i = \frac{\exp(q^\top (s_i + e_i))}{\sum_{j} \exp(q^\top (s_j + e_j))}, \quad
-\mathrm{pool}(S) = \sum_i a_i (s_i + e_i),
-\end{equation}
-where $q$ is a learned query and $e_i$ are learned positional embeddings. The
-positional embeddings are initialised to zero, so the pooler begins as exact mean
-pooling and departs from it only as training requires.
-
-\subsection{Two-level masking}
-\glocal{} corrupts the input at two independent levels. At the text level, each
-paragraph is masked before being read by the student: sentences are dropped with
-probability $0.20$, and within the surviving text spans of three to five words are
-replaced by a single mask token until about $15\%$ of words are covered. At the
-structural level, a paragraph dropout removes $30\%$ of paragraphs, but only at the
-pooling stage. The student encoder still sees all $N$ masked paragraphs; the dropout
-selects a subset of the resulting vectors before pooling, which yields a partial
-view $z_{\mathrm{partial}} = \mathrm{pool}(S_{\mathrm{kept}})$. Keeping all $N$
-paragraphs in the encoder is required so that the paragraph-level objective can
-compare student and teacher vectors position by position.
-
-\subsection{Information bottleneck}
-The partial document vector is passed through a stochastic bottleneck. Two linear
-heads produce a mean and a log standard deviation, and a latent code is sampled with
-the reparameterisation trick,
-\begin{equation}
-\mu = W_\mu z_{\mathrm{partial}}, \quad
-\log\sigma = \mathrm{clip}(W_\sigma z_{\mathrm{partial}}, -10, 10),
-\end{equation}
-\begin{equation}
-z = \mu + \sigma \odot \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I),
-\end{equation}
-with $z \in \mathbb{R}^{256}$. A two-layer projector $g$ maps $z$ back to
-$\mathbb{R}^{768}$, giving $Z_{\mathrm{proj}} = g(z)$. The compression cost is the
-Kullback-Leibler divergence to a standard normal prior, computed in closed form and
-floored per dimension by a free-bits budget $\lambda$,
-\begin{equation}
-\mathcal{L}_{\mathrm{compress}} = \beta_t \sum_{j=1}^{256}
-\max\!\Big(\lambda,\ \tfrac{1}{2}\big(\mu_j^2 + \sigma_j^2 - 1 - 2\log\sigma_j\big)\Big).
-\end{equation}
-The clip on $\log\sigma$ keeps the term finite under bfloat16. The weight $\beta_t$
-follows a linear warm-up from zero to one over the first quarter of training, which
-lets the alignment objectives organise the representation before compression starts
-to bite. We use $\lambda = 0.05$ nats per dimension. A larger floor was tried and
-rejected: at $\lambda = 0.5$ the $128$-nat floor dominated the objective and forced
-the mean toward a fixed magnitude regardless of the input, which is the opposite of
-the intended behaviour.
-
-\subsection{Multi-granularity alignment}
-The teacher is a momentum copy of the encoder and pooler, never updated by gradient.
-It reads the clean document and produces a full-document target
-$Z' = \mathrm{pool}_{\mathrm{T}}(S_{\mathrm{T}})$, which is centred as described
-below. Writing $\mathrm{sg}$ for stop-gradient, $h$ for the predictor, and
-$d(u,v) = 1 - \cos(u,v)$ for the cosine distance, the three alignment losses are
-\begin{align}
-\mathcal{L}_{\mathrm{local}} &= d\big(S,\ \mathrm{sg}(S_{\mathrm{T}})\big), \\
-\mathcal{L}_{\mathrm{inter}} &= d\big(h(z_{\mathrm{partial}}),\ \mathrm{sg}(Z')\big), \\
-\mathcal{L}_{\mathrm{global}} &= d\big(h(Z_{\mathrm{proj}}),\ \mathrm{sg}(Z')\big).
-\end{align}
-The local term matches every student paragraph vector to the corresponding teacher
-paragraph vector. The intermediate term asks the partial pooled view to predict the
-full document before compression, and the global term asks the compressed and
-projected code to predict the same target after compression. Both document-level
-terms regress onto a single teacher vector, so the bottleneck must preserve whatever
-is needed to reconstruct the global representation from a partial and corrupted
-input.
-
-\subsection{Preventing collapse}
-The predictor $h$ is applied to the student branch only. This asymmetry, together
-with the stop-gradient on the teacher, is the formal mechanism that removes the
-constant-output fixed point in non-contrastive self-distillation
-\cite{grill2020bootstrap,chen2021exploring}. The teacher tracks the student through
-an exponential moving average with rate $\tau = 0.996$, applied to both encoder and
-pooler after every optimiser step; running statistics in normalisation layers are
-copied rather than averaged, since averaging them drifts away from the student's
-activation distribution.
-
-On its own the asymmetry was not enough on legal text. We add the variance and
-covariance regularisers of VICReg \cite{bardes2022vicreg} on the student paragraph
-vectors,
-\begin{equation}
-V(S) = \tfrac{1}{d}\sum_{j} \max\!\big(0,\ \gamma - \sqrt{\mathrm{Var}(S_{\cdot j}) + \epsilon}\big),
-\end{equation}
-\begin{equation}
-C(S) = \tfrac{1}{d}\sum_{i \ne j} \big[\mathrm{Cov}(S)\big]_{ij}^2,
-\end{equation}
-with the variance hinge $\gamma = 0.5$. Because per-document paragraph statistics do
-not see across-document variation, we add the same two regularisers in a temporal
-form on the post-predictor document code and on the bottleneck mean, computed
-against a rolling buffer of the sixteen most recent samples whose gradient is
-detached. These temporal terms penalise a representation that is constant across
-consecutive documents even when it varies within a document.
-
-The remaining and most important fix concerns the teacher target itself. ECtHR
-judgments share a large amount of boilerplate, and in the encoder's initial space
-the documents are nearly indistinguishable: a probe over $200$ documents found a
-median pairwise cosine of $0.9997$, with every ordered pair above $0.99$. A teacher
-target that is almost constant across documents lets the predictor satisfy
-$\mathcal{L}_{\mathrm{inter}}$ and $\mathcal{L}_{\mathrm{global}}$ by emitting that
-constant. We remove this fixed point with DINO-style centring
-\cite{caron2021emerging}: a running mean $c$ is maintained with momentum $0.9$ and
-subtracted from the teacher output,
-\begin{equation}
-Z'_{\mathrm{c}} = Z' - c, \qquad
-c \leftarrow 0.9\,c + 0.1\,\overline{Z'}_{\mathrm{batch}}.
-\end{equation}
-The centred vector is the actual regression target. Section~\ref{sec:results} shows
-that this single change is what keeps training stable.
-
-\subsection{Objective and optimisation}
-The four primary losses are combined by homoscedastic uncertainty weighting
-\cite{kendall2018multi} with learned log-variances
-$s = (s_{\mathrm{c}}, s_{\mathrm{l}}, s_{\mathrm{i}}, s_{\mathrm{g}})$,
-\begin{equation}
-\mathcal{L}_{\mathrm{UW}} = \!\!\sum_{k} \big(e^{-s_k}\,\mathcal{L}_k + s_k\big),
-\end{equation}
-and the anti-collapse regularisers are added with fixed weights outside the weighted
-sum,
-\begin{equation}
-\mathcal{L} = \mathcal{L}_{\mathrm{UW}} + \omega_v V(S) + \omega_c C(S)
-+ \mathcal{L}_{\mathrm{temporal}}.
-\end{equation}
-The weights $s$ are given their own parameter group with a learning rate three
-orders of magnitude larger than the encoder and no weight decay. Without this, the
-gradient on $s$ is too small to move the weights away from their initialisation, and
-the uncertainty weighting stays degenerate at uniform weights for the whole run.
-
-\subsection{The H-MLM baseline}
-\hmlm{} keeps the backbone, the paragraph encoding, and the attention pooler, and
-removes everything specific to \glocal{}. It optimises a token-level masked language
-modelling loss $\mathcal{L}_{\mathrm{mlm}}$ on each paragraph with a $15\%$ mask
-rate, and a single pooling objective that asks the attention pool over a $70\%$
-subset of paragraphs to predict the stop-gradient mean of all paragraph vectors,
-\begin{equation}
-\mathcal{L} = \tfrac{1}{2}\mathcal{L}_{\mathrm{mlm}}
-+ \tfrac{1}{2}\,d\big(\mathrm{pool}(S_{\mathrm{kept}}),\ \mathrm{sg}(\overline{S})\big).
-\end{equation}
-There is no bottleneck, no teacher, no predictor, and no uncertainty weighting. The
-comparison between \glocal{} and \hmlm{} is therefore a comparison of pre-training
-objectives under an identical architecture and an identical fine-tuning procedure.
 
 % ---------------------------------------------------------------------------
 \section{Experimental Setup}
@@ -805,8 +981,8 @@ the near-constant teacher target produced by boilerplate-heavy legal text, and
 showed that centring the target removes it. Future work should run controlled
 ablations of the stabilisation terms, test a decoupled or annealed compression
 schedule that preserves more lexical detail at larger $N$, and study whether the
-crossover point can be shifted with a larger backbone or a curriculum over the
-number of labelled examples.
+crossover point can be shifted with a larger backbone, a finer-grained sweep of the
+number of labelled examples around the observed crossover, or a curriculum over it.
 
 % ---------------------------------------------------------------------------
 \appendices
@@ -820,7 +996,10 @@ bfloat16. The per-dimension free-bits floor replaces each term by its maximum wi
 $\lambda$, so a dimension contributes no gradient while it uses fewer than $\lambda$
 nats. With $\lambda = 0.05$ and a $256$-dimensional latent the floor on the total
 divergence is $12.8$ nats, low enough to permit substantial compression while ruling
-out a full posterior collapse to the prior. The cosine objectives use
+out a full posterior collapse to the prior. A larger floor over-constrains the
+model: at $\lambda = 0.5$ the resulting $128$-nat floor dominates the objective and
+pins the mean to a fixed magnitude regardless of the input, which is why we settled
+on $\lambda = 0.05$. The cosine objectives use
 $d(u,v) = 1 - \cos(u,v)$; $\mathcal{L}_{\mathrm{local}}$ flattens the per-document
 paragraph matrices before computing the mean cosine, so each student paragraph is
 matched to the teacher paragraph at the same position. The uncertainty weighting
@@ -842,6 +1021,20 @@ $\lambda = 0.05$. The decisive failure was the near-constant teacher target indu
 by boilerplate, measured as a median inter-document cosine of $0.9997$, which DINO
 centring removed. The first stable epoch is the one shown in
 Figure~\ref{fig:dynamics}.
+
+The variance and covariance regularisers applied to the student paragraph matrix
+$S$ are
+\begin{equation}
+V(S) = \tfrac{1}{d}\sum_{j} \max\!\big(0,\ \gamma - \sqrt{\mathrm{Var}(S_{\cdot j}) + \epsilon}\big),
+\quad
+C(S) = \tfrac{1}{d}\sum_{i \ne j} \big[\mathrm{Cov}(S)\big]_{ij}^2,
+\end{equation}
+with variance hinge $\gamma = 0.5$. The temporal variant applies the same two
+expressions to the post-predictor document code
+$\bm{Z}_{\mathrm{proj}}^{\mathrm{pred}}$ and the bottleneck mean $\bm{\mu}$, computed
+against a detached rolling buffer of the sixteen most recent samples, so that
+$\mathcal{L}_{\mathrm{temporal}}$ in Eq.~\ref{eq:total} penalises representations
+that stay constant across consecutive documents.
 
 \section{Hyperparameters}
 \label{app:hparams}

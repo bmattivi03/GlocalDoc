@@ -36,42 +36,38 @@
   EMA/.style  ={-{Stealth[length=5pt]}, thick, ibOrange!80, dashed},
 }
 
-%% Column x-centres :  Teacher 0 · loss-spine 3.8 · predictors 6.8 · Student 10.4 · Reg 14.8
+%% Column x-centres :  Teacher 0 · loss-spine 4.4 · predictors 7.4 · Student 11.0 · Reg 16.6
 %% Row y-centres    :  in 0 · enc -2.3 · cls -4.6 · drop -6.6 · pool -8.4
 %%                     ztilde/zpartial -10.6 · IB -13.2 · Zproj -15.8
 
 \begin{document}
 \begin{tikzpicture}
 
-%% ══════════════ TEACHER branch (x = 0) — separate frozen EMA encoder ══════════════
+%% ══════════════ TEACHER lane (x = 0) — separate frozen EMA encoder ══════════════
 \node[T]   (t_in)  at (0,   0   ) {Clean paragraphs $\bm{\mathcal{P}}$\\[-2pt]\footnotesize $N$ strings};
-\node[ENC] (t_enc) at (0,  -2.3 ) {DistilRoBERTa\\[-2pt]\footnotesize EMA teacher $\cdot$ frozen $\cdot$ no-grad};
+\node[ENC] (t_enc) at (0,  -2.3 ) {DistilRoBERTa\\[-2pt]\footnotesize EMA teacher $\cdot$ frozen};
 \node[T]   (t_cls) at (0,  -4.6 ) {$\bm{H}_T\in\mathbb{R}^{N\times768}$\\[-2pt]\footnotesize CLS per paragraph};
-\node[PL]  (t_pl)  at (0,  -8.4 ) {AttentionPooling\\[-2pt]\footnotesize EMA teacher $\cdot$ frozen};
-\node[T, minimum width=3.2cm]
-           (t_zt)  at (0, -10.6 ) {$\tilde{\bm{Z}}'\in\mathbb{R}^{768}$\\[-2pt]\footnotesize teacher full-doc, DINO-centered\\[-2pt]\footnotesize $\tilde{\bm{Z}}'=\bm{Z}'-\bm{c}$};
+\node[PL]  (t_pl)  at (0,  -8.4 ) {AttentionPooling\\[-2pt]\footnotesize EMA teacher};
+\node[T]   (t_zt)  at (0, -10.6 ) {$\tilde{\bm{Z}}'\in\mathbb{R}^{768}$\\[-2pt]\footnotesize teacher target\\[-2pt]\footnotesize DINO-centred $\tilde{\bm{Z}}'{=}\bm{Z}'{-}\bm{c}$};
 
 \draw[Tarr] (t_in)  -- (t_enc);
 \draw[Tarr] (t_enc) -- (t_cls);
 \draw[Tarr] (t_cls) -- (t_pl);
 \draw[Tarr] (t_pl)  -- (t_zt);
 
-%% ══════════════ STUDENT branch (x = 10.4) — trainable ══════════════
-\node[S, minimum width=3.6cm]
-           (s_in)  at (10.4,   0   ) {Masked paragraphs $\bm{\mathcal{P}}_m$\\[-2pt]\footnotesize $N$ strings $\cdot$ sent.\ drop $20\%$ $+$ span mask $15\%$};
-\node[ENC] (s_enc) at (10.4,  -2.3 ) {DistilRoBERTa\\[-2pt]\footnotesize student $\cdot$ trainable};
-\node[S, minimum width=3.6cm]
-           (s_cls) at (10.4,  -4.6 ) {$\bm{H}_S\in\mathbb{R}^{N\times768}$\\[-2pt]\footnotesize CLS per paragraph $=\bm{s}_{\mathrm{chunks}}$};
-\node[DR]  (s_dr)  at (10.4,  -6.6 ) {Paragraph Dropout $30\%$\\[-2pt]\footnotesize keep $M{<}N$ via $\mathcal{I}$};
-\node[PL]  (s_pl)  at (10.4,  -8.4 ) {AttentionPooling\\[-2pt]\footnotesize student $\cdot$ trainable};
-\node[S]   (s_zp)  at (10.4, -10.6 ) {$\bm{z}_{\mathrm{partial}}\in\mathbb{R}^{768}$\\[-2pt]\footnotesize student partial pool};
-\node[IB, minimum width=4.9cm, minimum height=1.9cm]
-           (s_ib)  at (10.4, -13.2 ) {\textbf{IB Bottleneck}\\[1pt]
-                 \footnotesize $\bm{\mu},\log\bm{\sigma}=W_\mu\bm{z},W_\sigma\bm{z}\in\mathbb{R}^{256}$\\[-1pt]
-                 \footnotesize $\bm{z}=\bm{\mu}+\exp(\log\bm{\sigma})\odot\bm{\varepsilon}$\\[-1pt]
-                 \footnotesize $\log\bm{\sigma}\in[-10,10]$ (clamped)};
-\node[S, minimum width=3.6cm]
-           (s_zj)  at (10.4, -15.8 ) {$\bm{Z}_{\mathrm{proj}}\in\mathbb{R}^{768}$\\[-2pt]\footnotesize MLP projector $256\!\to\!512\!\to\!768$};
+%% ══════════════ STUDENT lane (x = 11) — trainable ══════════════
+\node[S, minimum width=3.4cm]
+           (s_in)  at (11.0,   0   ) {Masked paragraphs $\bm{\mathcal{P}}_m$\\[-2pt]\footnotesize $N$ strings $\cdot$ text masking};
+\node[ENC] (s_enc) at (11.0,  -2.3 ) {DistilRoBERTa\\[-2pt]\footnotesize student $\cdot$ trainable};
+\node[S, minimum width=3.2cm]
+           (s_cls) at (11.0,  -4.6 ) {$\bm{H}_S\in\mathbb{R}^{N\times768}$\\[-2pt]\footnotesize CLS per paragraph};
+\node[DR]  (s_dr)  at (11.0,  -6.6 ) {Paragraph dropout $30\%$\\[-2pt]\footnotesize keep $M{<}N$};
+\node[PL]  (s_pl)  at (11.0,  -8.4 ) {AttentionPooling\\[-2pt]\footnotesize student $\cdot$ trainable};
+\node[S]   (s_zp)  at (11.0, -10.6 ) {$\bm{z}_{\mathrm{partial}}\in\mathbb{R}^{768}$\\[-2pt]\footnotesize partial pool};
+\node[IB, minimum width=3.4cm, minimum height=1.3cm]
+           (s_ib)  at (11.0, -13.2 ) {\textbf{IB Bottleneck}\\[-1pt]\footnotesize $\bm{\mu},\log\bm{\sigma}\to\bm{z}\in\mathbb{R}^{256}$\\[-2pt]\footnotesize $\bm{z}=\bm{\mu}+\bm{\sigma}\odot\bm{\varepsilon}$};
+\node[S, minimum width=3.2cm]
+           (s_zj)  at (11.0, -15.8 ) {$\bm{Z}_{\mathrm{proj}}\in\mathbb{R}^{768}$\\[-2pt]\footnotesize projector $\to\mathbb{R}^{768}$};
 
 \draw[Sarr] (s_in)  -- (s_enc);
 \draw[Sarr] (s_enc) -- (s_cls);
@@ -81,36 +77,34 @@
 \draw[Sarr] (s_zp)  -- (s_ib);
 \draw[Sarr] (s_ib)  -- (s_zj);
 
-%% ══════════════ Student-only PREDICTOR (inline, shared weights) ══════════════
-\node[PRED] (p_a) at (6.8, -10.6) {Predictor\\[-2pt]\footnotesize $\bm{z}_{\mathrm{partial}}^{\mathrm{pred}}$};
-\node[PRED] (p_b) at (6.8, -15.8) {Predictor\\[-2pt]\footnotesize $\bm{Z}_{\mathrm{proj}}^{\mathrm{pred}}$};
+%% ══════════════ Student-only PREDICTOR (x = 7.4, shared weights) ══════════════
+\node[PRED] (p_a) at (7.4, -10.6) {Predictor\\[-2pt]\footnotesize $\bm{z}_{\mathrm{partial}}^{\mathrm{pred}}$};
+\node[PRED] (p_b) at (7.4, -15.8) {Predictor\\[-2pt]\footnotesize $\bm{Z}_{\mathrm{proj}}^{\mathrm{pred}}$};
 \draw[Sarr] (s_zp.west) -- (p_a.east);
 \draw[Sarr] (s_zj.west) -- (p_b.east);
 \draw[densely dashed, pPurple!70] (p_a.south) -- (p_b.north)
       node[midway, fill=white, inner sep=1pt, font=\scriptsize, text=pPurple!80]{shared $\theta$};
 
-%% ══════════════ LOSS SPINE (x = 3.8) — each loss between its operands ══════════════
-\node[LO] (l_loc) at (3.8,  -4.6) {$\mathcal{L}_{\mathrm{local}}$\\[-2pt]\footnotesize cosine $\cdot$ all $N$ pairs};
+%% ══════════════ LOSS SPINE (x = 4.4) — each loss between its operands ══════════════
+\node[LO, minimum width=2.6cm] (l_loc) at (4.4,  -4.6) {$\mathcal{L}_{\mathrm{local}}$\\[-2pt]\footnotesize cosine, all pairs};
 \draw[Larr] (t_cls.east) -- (l_loc.west);
 \draw[Larr] (s_cls.west) -- (l_loc.east);
 
-\node[LO] (l_int) at (3.8, -10.6) {$\mathcal{L}_{\mathrm{inter}}$\\[-2pt]\footnotesize cosine $\cdot$ partial (pred) vs $\tilde{\bm{Z}}'$};
+\node[LO, minimum width=2.6cm] (l_int) at (4.4, -10.6) {$\mathcal{L}_{\mathrm{inter}}$\\[-2pt]\footnotesize partial vs teacher};
 \draw[Larr] (t_zt.east) -- (l_int.west);
 \draw[Larr] (p_a.west)  -- (l_int.east);
 
-\node[LO] (l_glb) at (3.8, -15.8) {$\mathcal{L}_{\mathrm{global}}$\\[-2pt]\footnotesize cosine $\cdot$ post-IB (pred) vs $\tilde{\bm{Z}}'$};
+\node[LO, minimum width=2.6cm] (l_glb) at (4.4, -15.8) {$\mathcal{L}_{\mathrm{global}}$\\[-2pt]\footnotesize post-IB vs teacher};
 \draw[Larr] (p_b.west) -- (l_glb.east);
 \draw[Larr, rounded corners=6pt] (t_zt.south) |- (l_glb.west);   %% single teacher-target rail
 
-%% ══════════════ REGULARIZERS (x = 14.8) — beside their source ══════════════
-\node[LO, minimum width=3.0cm, minimum height=1.5cm]
-      (l_cmp) at (15.2, -13.2) {$\mathcal{L}_{\mathrm{compress}}$\\[-2pt]
-            \footnotesize $\beta(t)\,\mathrm{KL}\bigl(\mathcal{N}(\bm{\mu},\bm{\sigma}^2)\,\|\,\mathcal{N}(\bm{0},\bm{I})\bigr)$\\[-1pt]
-            \footnotesize free bits $\lambda{=}0.05$ $\cdot$ $\beta:0\!\to\!1$ (25\% steps)};
+%% ══════════════ REGULARIZERS (x = 16.6) — clearly separated right lane ══════════════
+\node[LO, minimum width=3.0cm, minimum height=1.3cm]
+      (l_cmp) at (16.6, -13.2) {$\mathcal{L}_{\mathrm{compress}}$\\[-2pt]\footnotesize $\beta(t)\,\mathrm{KL}$ to prior\\[-2pt]\footnotesize free bits $\lambda{=}0.05$};
 \draw[Larr] (s_ib.east) -- (l_cmp.west);
 
-\node[LOX] (l_var) at (15.2,  -4.0) {$\mathcal{L}_{\mathrm{variance}}$\\[-2pt]\footnotesize VICReg std-hinge $\cdot$ $\lambda_{\mathrm{var}}{=}5.0$};
-\node[LOX] (l_cov) at (15.2,  -5.9) {$\mathcal{L}_{\mathrm{covariance}}$\\[-2pt]\footnotesize VICReg off-diag $\cdot$ $\lambda_{\mathrm{cov}}{=}0.04$};
+\node[LOX] (l_var) at (16.6,  -4.0) {$\mathcal{L}_{\mathrm{variance}}$\\[-2pt]\footnotesize VICReg std-hinge};
+\node[LOX] (l_cov) at (16.6,  -5.9) {$\mathcal{L}_{\mathrm{covariance}}$\\[-2pt]\footnotesize VICReg off-diag};
 \draw[Larr] (s_cls.east) -- (l_var.west);
 \draw[Larr] (s_cls.east) -- (l_cov.west);
 
@@ -120,13 +114,11 @@
 \draw[EMA] (s_pl.west) -- (t_pl.east)
       node[midway, above, font=\scriptsize\itshape, text=ibOrange!85!black]{EMA $\tau{=}0.996$ (pool)};
 
-%% ══════════════ TOTAL LOSS ══════════════
-\node[TOT, minimum width=17cm, minimum height=2.0cm, align=center]
-      (l_tot) at (7.0, -18.4) {%
-      \textbf{Total loss --- Uncertainty-Weighted alignment $+$ fixed-weight VICReg}\\[3pt]
-      $\displaystyle \mathcal{L}=\!\!\sum_{i\in\{\mathrm{compress},\,\mathrm{local},\,\mathrm{inter},\,\mathrm{global}\}}\!\!\bigl(e^{-s_i}\mathcal{L}_i+s_i\bigr)\;+\;\lambda_{\mathrm{var}}\mathcal{L}_{\mathrm{variance}}\;+\;\lambda_{\mathrm{cov}}\mathcal{L}_{\mathrm{covariance}}$\\[3pt]
-      \footnotesize $s_i=\log\sigma_i^{2}$ learnable, clamped to $[-10,10]$ \qquad
-      $\lambda_{\mathrm{var}}{=}5.0,\ \lambda_{\mathrm{cov}}{=}0.04$ fixed (never down-weighted by UW)};
+%% ══════════════ TOTAL LOSS (compact banner) ══════════════
+\node[TOT, minimum width=18cm, minimum height=1.2cm, align=center]
+      (l_tot) at (8.0, -18.6) {%
+      \textbf{Total loss --- Uncertainty-Weighted alignment $+$ fixed-weight VICReg (outside UW)}\\[2pt]
+      $\displaystyle \mathcal{L}=\!\!\sum_{i\in\{\mathrm{compress},\,\mathrm{local},\,\mathrm{inter},\,\mathrm{global}\}}\!\!\bigl(e^{-s_i}\mathcal{L}_i+s_i\bigr)\;+\;\lambda_{\mathrm{var}}\mathcal{L}_{\mathrm{variance}}\;+\;\lambda_{\mathrm{cov}}\mathcal{L}_{\mathrm{covariance}}$};
 
 %% ══════════════ BACKGROUND PANELS (fit, auto-sized) ══════════════
 \begin{scope}[on background layer]
@@ -139,14 +131,13 @@
 \node[font=\bfseries\scriptsize, text=lossRed!75!black, anchor=south] at (uwbox.north) {outside UW (fixed weight)};
 
 %% ══════════════ LEGEND ══════════════
-\node[font=\footnotesize, anchor=north west, align=left] at (-2.0,-20.2) {%
-  \textcolor{sGreen!80}{\rule[0.4ex]{1.0cm}{0.7pt}}~ trainable (student)\qquad
-  \textcolor{tBlue!80}{\rule[0.4ex]{1.0cm}{0.7pt}}~ EMA teacher (no-grad)\qquad
-  \textcolor{ibOrange}{\rule[0.4ex]{1.0cm}{0.7pt}}~ EMA update (encoder $+$ pool), $\tau{=}0.996$\qquad
-  \textcolor{lossRed}{\rule[0.4ex]{1.0cm}{0.7pt}}~ loss signal\\[2pt]
+\node[font=\footnotesize, anchor=north west, align=left] at (-1.5,-20.0) {%
+  \textcolor{sGreen!80}{\rule[0.4ex]{0.8cm}{0.7pt}}~ trainable student\qquad
+  \textcolor{tBlue!80}{\rule[0.4ex]{0.8cm}{0.7pt}}~ EMA teacher (no-grad)\qquad
+  \textcolor{ibOrange}{\rule[0.4ex]{0.8cm}{0.7pt}}~ EMA update ($\tau{=}0.996$)\qquad
+  \textcolor{lossRed}{\rule[0.4ex]{0.8cm}{0.7pt}}~ loss signal\\[2pt]
   \textcolor{pPurple!80}{$[\,\cdots\,]$}~ Predictor: student-only BYOL/SimSiam head $768\!\to\!512$, LN, GELU, $\to\!768$ (shared $\theta$; teacher has none)\qquad
-  \textcolor{lossRed}{$[\!=\!]$}~ double border $=$ fixed weight, outside UW\\[2pt]
-  \textit{Training also applies temporal VICReg on $\bm{Z}_{\mathrm{proj}}^{\mathrm{pred}}$ and $\bm{\mu}$ via rolling buffers (script-level regulariser; not shown).}};
+  \textcolor{lossRed}{$[\!=\!]$}~ double border $=$ fixed weight, outside UW};
 
 \end{tikzpicture}
 \end{document}

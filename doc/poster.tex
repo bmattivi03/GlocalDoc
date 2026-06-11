@@ -1,12 +1,12 @@
 %==============================================================================
-%  GlocalDoc — A0 landscape billboard poster  (rebuild for legibility)
+%  GlocalDoc — A0 PORTRAIT billboard poster  (rebuild for legibility)
 %  Engine: tectonic (XeTeX).  Build:  tectonic poster.tex
 %  Stack: article + geometry-A0 + tgheros (Helvetica clone) + TikZ/pgfplots.
 %  Coordinates are millimetres (x=1mm, y=1mm); fonts set with explicit \fontsize
 %  so every size below is the literal pt on the printed A0 sheet.
 %==============================================================================
 \documentclass{article}
-\usepackage[paperwidth=1189mm,paperheight=841mm,margin=0mm]{geometry}
+\usepackage[paperwidth=841mm,paperheight=1189mm,margin=0mm]{geometry}
 \usepackage{fontspec}
 % TeX Gyre Heros (Helvetica clone) — loaded by file so tectonic/XeTeX actually
 % uses it (the tgheros Type1 package silently fell back to Latin Modern serif).
@@ -80,78 +80,78 @@
 \begin{tikzpicture}[x=1mm,y=1mm]
 
 %================================ BACKDROP ====================================
-\fill[cPage] (0,0) rectangle (1189,841);
-\fill[cNavy] (0,700) rectangle (1189,841);          % header band (full bleed)
-\fill[cBlue] (0,694)  rectangle (1189,700);          % accent rule under header
-\fill[cNavy] (0,0)    rectangle (1189,96);           % footer band (full bleed)
-\fill[cBlue] (0,96)   rectangle (1189,102);          % accent rule over footer
+\fill[cPage] (0,0) rectangle (841,1189);
+\fill[cNavy] (0,1069) rectangle (841,1189);          % header band (full bleed)
+\fill[cBlue] (0,1063) rectangle (841,1069);          % accent rule under header
+\fill[cNavy] (0,0)    rectangle (841,96);            % footer band (full bleed)
+\fill[cBlue] (0,96)   rectangle (841,102);           % accent rule over footer
 
 %================================ HEADER ======================================
-\node[anchor=west] at (44,768)
-      {\includegraphics[height=82mm]{assets/unibz_logo_white.pdf}};
-\node[anchor=west, white, font=\fontsize{92}{96}\selectfont\bfseries] at (172,796)
+\node[anchor=west] at (40,1126)
+      {\includegraphics[height=66mm]{assets/unibz_logo_white.pdf}};
+\node[anchor=center, white, font=\fontsize{86}{90}\selectfont\bfseries] at (470,1150)
       {GlocalDoc};
-\node[anchor=west, white, font=\fontsize{32}{36}\selectfont] at (176,748)
+\node[anchor=center, white, text width=720mm, align=center, font=\fontsize{27}{31}\selectfont] at (420,1108)
       {A global and local \textbf{information bottleneck} for few-shot legal document classification};
-\node[anchor=east, white,        font=\fontsize{27}{30}\selectfont\bfseries] at (1150,798){Brando Mattivi $\cdot$ Roger Feliu};
-\node[anchor=east, white!88,     font=\fontsize{23}{26}\selectfont]          at (1150,768){Free University of Bozen-Bolzano};
-\node[anchor=east, white!72,     font=\fontsize{21}{24}\selectfont]          at (1150,741){Final Project $\cdot$ Natural Language Processing $\cdot$ 2026};
+\node[anchor=center, white!90, font=\fontsize{24}{27}\selectfont] at (420,1082)
+      {\textbf{Brando Mattivi} $\cdot$ \textbf{Roger Feliu} \quad$\cdot$\quad Free University of Bozen-Bolzano \quad$\cdot$\quad Final Project, NLP 2026};
 
 %============================ HEADLINE BAND ===================================
-\fill[black!9, rounded corners=14pt] (34.5,571.5) rectangle (1159.5,686.5);
-\fill[cBand, rounded corners=14pt] (32,575) rectangle (1157,690);
-\draw[cBlue, line width=1.7pt, rounded corners=14pt] (32,575) rectangle (1157,690);
-\fill[cBlue, rounded corners=14pt] (32,575) rectangle (44,690);   % left accent bar
-\fill[cBand] (38,575) rectangle (44,690);
+\fill[black!9, rounded corners=14pt] (54.5,891.5) rectangle (791.5,1046.5);
+\fill[cBand, rounded corners=14pt] (52,895) rectangle (789,1050);
+\draw[cBlue, line width=1.7pt, rounded corners=14pt] (52,895) rectangle (789,1050);
+\fill[cBlue, rounded corners=14pt] (52,895) rectangle (64,1050);   % left accent bar
+\fill[cBand] (58,895) rectangle (64,1050);
 
-\node[anchor=west, cBlue, font=\fontsize{22}{24}\selectfont\bfseries] at (60,676)
+\node[anchor=west, cBlue, font=\fontsize{22}{24}\selectfont\bfseries] at (80,1038)
       {WHAT WE FOUND};
-\node[anchor=north west, text width=640mm, align=left, text=cNavy,
-      font=\fontsize{50}{58}\selectfont] at (58,664)
-      {The bottleneck helps \textbf{only when labels are scarce.}\\
-       Give it enough labels and \textcolor{cOrange!88!black}{\textbf{plain hierarchical MLM wins.}}};
+\node[anchor=north west, text width=695mm, align=left, text=cNavy,
+      font=\fontsize{31}{37}\selectfont] at (80,1024)
+      {Compressing a judgment to its gist is a \textbf{double-edged prior}: it
+       \textbf{wins when labels are scarce}, but a plain hierarchical model
+       \textcolor{cOrange!88!black}{\textbf{overtakes it once labels are plentiful.}}};
 
-\draw[cBlue!35, line width=1.2pt] (706,584) -- (706,681);
+% paired stat chips (stacked, full width; honesty: the N=10 win is also stability)
+\fill[cChipB, rounded corners=12pt] (66,946) rectangle (775,986);
+\fill[cBlue,  rounded corners=10pt] (74,950) rectangle (190,982);
+\node[white, font=\fontsize{27}{27}\selectfont\bfseries] at (132,966) {N $=$ 10};
+\node[anchor=west, text=cInk, font=\fontsize{24}{26}\selectfont] at (204,966)
+      {GlocalDoc \textbf{\color{cBlue}0.044} vs H-MLM 0.019 \ $\rightarrow$\ \textbf{2.3$\times$ macro-F1}, and far more stable (H-MLM fails on 2/5 seeds)};
 
-% paired stat chips (honesty: 2.3x never shown without the N>=50 flip)
-\fill[cChipB, rounded corners=12pt] (722,640) rectangle (1142,684);
-\fill[cBlue,  rounded corners=10pt] (730,646) rectangle (838,678);
-\node[white, font=\fontsize{30}{30}\selectfont\bfseries] at (784,662) {N $=$ 10};
-\node[anchor=west, text=cInk, font=\fontsize{26}{28}\selectfont] at (850,662)
-      {GlocalDoc \textbf{\color{cBlue}0.044} vs H-MLM 0.019 \ $\rightarrow$\ \textbf{2.3$\times$, bottleneck wins}};
-
-\fill[cChipO, rounded corners=12pt] (722,588) rectangle (1142,632);
-\fill[cOrange,rounded corners=10pt] (730,594) rectangle (838,626);
-\node[white, font=\fontsize{30}{30}\selectfont\bfseries] at (784,610) {N $\geq$ 50};
-\node[anchor=west, text=cInk, font=\fontsize{26}{28}\selectfont] at (850,610)
-      {H-MLM \textbf{\color{cOrange!85!black}0.273} vs GlocalDoc 0.108 \ $\rightarrow$\ \textbf{the ordering flips}};
+\fill[cChipO, rounded corners=12pt] (66,900) rectangle (775,940);
+\fill[cOrange,rounded corners=10pt] (74,904) rectangle (190,936);
+\node[white, font=\fontsize{27}{27}\selectfont\bfseries] at (132,920) {N $\geq$ 50};
+\node[anchor=west, text=cInk, font=\fontsize{24}{26}\selectfont] at (204,920)
+      {H-MLM \textbf{\color{cOrange!85!black}0.273} vs GlocalDoc 0.108 \ $\rightarrow$\ \textbf{the ordering flips} as labels grow};
 
 %================================ COLUMN 1 ====================================
-% (1) Why & what we ask
-\postercard{32}{320}{388}{560}{cGreen}{1}{Why \& what we ask}
-\node[anchor=north west, text width=322mm, align=left, text=cInk,
-      font=\fontsize{24}{33}\selectfont] at (50,524)
-  {\sub{Why.}\\[5pt]
-   \bull{cGreen} Language models capture \emph{local} meaning but lose the \emph{whole}
-   document; in a legal judgment the decisive signal is spread across many paragraphs.\\[15pt]
-   \bull{cGreen} Labelling ECtHR cases needs expert effort, so the realistic setting
-   is \textbf{few-shot}.\\[22pt]
-   \sub{We ask.}\\[5pt]
-   \bull{cGreen} \textbf{RQ1} Beat hierarchical MLM for few-shot document features?\\[10pt]
-   \bull{cGreen} \textbf{RQ2} Does the advantage depend on the number of labels \emph{N}?\\[10pt]
-   \bull{cGreen} \textbf{RQ3} What breaks on heavy boilerplate, and what fixes it?};
-% DATA panel at the foot of the card (clear, three short lines)
-\fill[cGreen!12, rounded corners=10pt] (46,326) rectangle (374,392);
-\draw[cGreen!55, line width=1pt, rounded corners=10pt] (46,326) rectangle (374,392);
-\node[anchor=north west, cGreen!42!black, font=\fontsize{22}{22}\selectfont\bfseries] at (60,385){DATA};
-\node[anchor=north west, text width=300mm, align=left, text=cInk,
-      font=\fontsize{21}{26}\selectfont] at (60,366)
-  {ECtHR judgments (LexGLUE), \textbf{10} article labels.\\
-   \textbf{5 to 50} paragraphs per case, about \textbf{100$\times$} class imbalance.\\
-   Primary metric: \textbf{macro-F1}.};
+% (1) Project overview  [portrait: col A, row 1]
+\postercard{52}{640}{408}{880}{cGreen}{1}{What we do \& why}
+\begin{scope}[shift={(20,320)}]
+\node[anchor=north west, text width=320mm, align=left, text=cInk,
+      font=\fontsize{23}{31}\selectfont] at (50,524)
+  {\bull{cGreen} \sub{The problem.}\, Language models read sentences well but lose the
+   document as a \emph{whole}; in a legal judgment the decisive signal is spread across
+   many paragraphs, and expert labels are scarce (\textbf{few-shot}).\\[15pt]
+   \bull{cGreen} \sub{What we build.}\, A frozen \textbf{teacher} reads the clean
+   judgment; a \textbf{student} reads a masked, partial copy and must reproduce the
+   teacher's reading at \textbf{three scales} --- paragraph, partial- and
+   whole-document --- squeezed through a compressive \textbf{information
+   bottleneck}.\\[15pt]
+   \bull{cGreen} \sub{The roots.}\, It adapts the \emph{Glocal Information Bottleneck}
+   (Yang 2025) from time series to legal text, and is tested against hierarchical
+   MLM (\textbf{H-MLM}) and a no-pretrain baseline on \textbf{ECtHR} judgments
+   (LexGLUE; 10 labels, ${\approx}100\times$ imbalance, macro-F1).\\[15pt]
+   \bull{cGreen} \sub{We ask three questions.}\\[7pt]
+   \hspace*{7mm}\textbf{RQ1}~ Does GlocalDoc beat a hierarchical MLM at few-shot?\\[6pt]
+   \hspace*{7mm}\textbf{RQ2}~ Does the advantage depend on the label budget \emph{N}?\\[6pt]
+   \hspace*{7mm}\textbf{RQ3}~ What breaks on boilerplate, and what fixes it?};
 
-% (4) Preventing collapse
-\postercard{32}{108}{388}{302}{cTeal}{4}{Preventing collapse}
+\end{scope}
+
+% (3) Preventing collapse  [portrait: col A, row 2]
+\postercard{52}{430}{408}{624}{cTeal}{3}{Preventing collapse}
+\begin{scope}[shift={(20,322)}]
 \node[anchor=north west, text width=320mm, align=left, text=cInk,
       font=\fontsize{24}{37}\selectfont] at (50,266)
   {\sub{The failure.} ECtHR judgments are mostly boilerplate; the raw encoder sees
@@ -163,9 +163,12 @@
    \sub{Also.} EMA teacher ($\tau$\,=\,0.996), predictor on the student only,
    VICReg variance \& covariance.};
 
-%================================ COLUMN 2 ====================================
-% (2) How GlocalDoc works  -- clean 3-stage schematic
-\postercard{416.5}{320}{772.5}{560}{cBlue}{2}{How GlocalDoc works}
+\end{scope}
+
+%================================ ROW 1 / COLUMN B ============================
+% (2) The architecture  -- clean 3-stage schematic
+\postercard{433}{640}{789}{880}{cBlue}{2}{The architecture}
+\begin{scope}[shift={(16.5,320)}]
 % teacher column x=489 ; student column x=700
 \node[tbox] (T1) at (489,505) {Clean document};
 \node[tbox] (T2) at (489,455) {\textbf{EMA teacher}\\\fontsize{19}{21}\selectfont frozen, momentum $\tau$\,=\,0.996};
@@ -191,8 +194,11 @@
       {Predictor on the student branch only; teacher updated by EMA, stop-gradient.
        \textcolor{cOrange!70!black}{\textbf{Dashed}} = the three alignment losses.};
 
-% (5) Results table
-\postercard{416.5}{108}{772.5}{302}{cSlate}{5}{Results}
+\end{scope}
+
+% (4) Results table  [portrait: col B, row 2]
+\postercard{433}{430}{789}{624}{cSlate}{4}{Results}
+\begin{scope}[shift={(16.5,322)}]
 \node[anchor=north west, text=cSlate, font=\fontsize{22}{25}\selectfont] at (432,262)
       {Macro-F1, mean\,$\pm$\,sd over 5 seeds};
 % column headers
@@ -221,16 +227,18 @@
        collapse to $\approx$0 while all 5 GlocalDoc seeds stay in \textbf{0.034 to
        0.057}: stability, not just a higher mean.};
 
-%================================ COLUMN 3 ====================================
-% (3) The crossover -- HERO chart
-\postercard{801}{108}{1157}{560}{cNavy}{3}{The crossover}
-\node[anchor=north, text width=336mm, align=center, text=cSlate,
-      font=\fontsize{24}{28}\selectfont] at (979,521)
+\end{scope}
+
+%================================ HERO (full width, bottom) ===================
+% (5) The crossover -- HERO chart
+\postercard{52}{110}{789}{405}{cNavy}{5}{The crossover}
+\node[anchor=north, text width=705mm, align=center, text=cSlate,
+      font=\fontsize{24}{28}\selectfont] at (420,368)
       {Macro-F1 vs labels per class \emph{N}, \textbf{log scale} (5 seeds).
        GlocalDoc wins at N\,$=$\,10; H-MLM takes over once labels are plentiful.};
-\begin{scope}[shift={(824,142)}]
+\begin{scope}[shift={(120,128)}]
 \begin{axis}[
-  width=328mm, height=360mm, anchor=south west,
+  width=640mm, height=205mm, anchor=south west,
   xmode=log, log basis x=10, xmin=8.4, xmax=119,
   xtick={10,50,100}, xticklabels={10,50,100},
   ymode=log, ymin=0.0009, ymax=0.6,
@@ -272,12 +280,12 @@
 \end{scope}
 
 %================================ FOOTER ======================================
-\node[anchor=west, text width=1095mm, align=left, white,
-      font=\fontsize{30}{36}\selectfont] at (40,64)
-      {\textbf{Bottom line:} the bottleneck is a strong prior. A lifesaver under extreme
+\node[anchor=west, text width=760mm, align=left, white,
+      font=\fontsize{25}{30}\selectfont] at (40,68)
+      {\textbf{Bottom line:} the bottleneck is a strong prior --- a lifesaver under extreme
        scarcity, a handicap once labels are plentiful (it discards the lexical detail the
        MLM keeps). \textbf{Match the objective to the data regime.}};
-\node[anchor=west, white!82, font=\fontsize{20}{24}\selectfont] at (40,22)
+\node[anchor=west, white!82, text width=760mm, font=\fontsize{17}{21}\selectfont] at (40,26)
       {Brando Mattivi $\cdot$ Roger Feliu $\cdot$ Free University of Bozen-Bolzano $\cdot$
        Final Project, Natural Language Processing, 2026 \quad$\cdot$\quad Methods:
        VICReg (Bardes 2022), BYOL (Grill 2020), DINO (Caron 2021), LexGLUE (Chalkidis 2022)};
